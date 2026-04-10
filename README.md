@@ -4,7 +4,7 @@ Real-time fraud detection service built with Go, PostgreSQL, Redis, and Kafka.
 
 ## Prerequisites
 
-- Go 1.22+
+- Go 1.26.1
 - Docker & Docker Compose
 
 ## Setup
@@ -59,10 +59,11 @@ The server starts on `http://localhost:8080`.
 fraud-detection/
 ├── cmd/api/          Entry point
 │   └── main.go
-├── config/           Environment loading and app configuration
-│   └── config.go
-├── database/         Database connection constructors
-│   └── postgres.go
+├── internal/
+│   ├── config/       Environment loading and app configuration
+│   │   └── config.go
+│   └── database/     Database connection constructors
+│       └── postgres.go
 ├── .env.example      Template for environment variables
 ├── docker-compose.yml
 ├── Makefile

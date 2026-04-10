@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"log"
 	"os"
 
@@ -16,17 +17,34 @@ type DBConfig struct {
 	DBSSLMode  string
 }
 
+func (c DBConfig) DSN() string {
+	return fmt.Sprintf(
+		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
+		c.DBHost,
+		c.DBPort,
+		c.DBUser,
+		c.DBPassword,
+		c.DBName,
+		c.DBSSLMode,
+	)
+}
+
 type AppConfig struct {
 	DB DBConfig
 }
 
-func LoadEnv() {
+func Load() AppConfig {
+	loadEnv()
+	return loadConfig()
+}
+
+func loadEnv() {
 	if err := godotenv.Load(); err != nil {
 		log.Fatal("error loading .env file")
 	}
 }
 
-func LoadConfig() AppConfig {
+func loadConfig() AppConfig {
 	return AppConfig{
 		DB: DBConfig{
 			DBHost:     requireEnv("POSTGRES_HOST"),

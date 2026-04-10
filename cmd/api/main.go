@@ -4,18 +4,24 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/Ahmet-Vt/fraud-detection/database"
-	"github.com/Ahmet-Vt/fraud-detection/config"
+	"github.com/Ahmet-Vt/fraud-detection/internal/config"
+	"github.com/Ahmet-Vt/fraud-detection/internal/database"
 	"github.com/gin-gonic/gin"
 )
 
 func main() {
-	config.LoadEnv()
-	cfg := config.LoadConfig()
+	cfg := config.Load()
 
-	db, err := database.NewPostgres(cfg.DB)
+	db, err := database.NewPostgres(cfg.DB.DSN())
 	if err != nil {
 		log.Fatal("failed to connect database: ", err)
+	}
+
+	migrator := database.NewMigrator(db)
+	// Register migrations here, e.g.:
+	// migrator.Register(migrations.All()...)
+	if err := migrator.Run(); err != nil {
+		log.Fatal("migrations failed: ", err)
 	}
 
 	router := gin.Default()
