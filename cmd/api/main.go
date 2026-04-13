@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"github.com/Ahmet-Vt/fraud-detection/internal/config"
 	"github.com/Ahmet-Vt/fraud-detection/internal/database"
+	"github.com/Ahmet-Vt/fraud-detection/migrations"
 	"github.com/gin-gonic/gin"
 )
 
@@ -17,7 +18,7 @@ func main() {
 	}
 
 	migrator := database.NewMigrator(db)
-	if err := migrator.Register(database.All()...); err != nil {
+	if err := migrations.Register(migrator); err != nil {
 		log.Fatal("failed to register migrations: ", err)
 	}
 

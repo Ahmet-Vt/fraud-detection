@@ -7,28 +7,37 @@ import (
 	"gorm.io/gorm"
 )
 
+type UserStatus string
+
+const (
+	UserStatusActive   UserStatus = "active"
+	UserStatusSuspended UserStatus = "suspended"
+	UserStatusDeleted UserStatus = "deleted"
+)
+
 type User struct {
-	ID           uuid.UUID     `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	Name         string        `gorm:"type:varchar(100);not null"`
-	Surname      string        `gorm:"type:varchar(100);not null"`
-	Email        string        `gorm:"type:varchar(255);uniqueIndex;not null"`
-	CreatedAt    time.Time     `gorm:"not null;default:now()"`
-	Transactions []Transaction `gorm:"foreignKey:UserID"`
+	ID           uuid.UUID     `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	Name         string        `json:"name" gorm:"type:varchar(100);not null"`
+	Surname      string        `json:"surname" gorm:"type:varchar(100);not null"`
+	Email        string        `json:"email" gorm:"type:varchar(255);uniqueIndex;not null"`
+	UserStatus   UserStatus    `json:"status" gorm:"column:status;type:user_status;not null"`
+	Transactions []Transaction `json:"transactions" gorm:"foreignKey:UserID"`
+	CreatedAt    time.Time     `json:"created_at" gorm:"not null;default:now()"`
 }
 
 type Transaction struct {
-	ID                  uuid.UUID `gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	UserID              uuid.UUID `gorm:"type:uuid;not null;index"`
-	User                User      `gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Amount              int64     `gorm:"type:bigint;not null"`
-	Latitude            float64   `gorm:"type:double precision;not null"`
-	Longitude           float64   `gorm:"type:double precision;not null"`
-	City                string    `gorm:"type:varchar(100);not null"`
-	Status              string    `gorm:"type:varchar(50);not null"`
-	AmountRuleMatched   bool      `gorm:"not null;default:false"`
-	LocationRuleMatched bool      `gorm:"not null;default:false"`
-	VelocityRuleMatched bool      `gorm:"not null;default:false"`
-	FraudStatus         bool      `gorm:"not null;default:false;index"`
+	ID                  uuid.UUID `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	UserID              uuid.UUID `json:"user_id" gorm:"type:uuid;not null;index"`
+	User                User      `json:"user" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Amount              int64     `json:"amount" gorm:"type:bigint;not null"`
+	Latitude            float64   `json:"latitude" gorm:"type:double precision;not null"`
+	Longitude           float64   `json:"longitude" gorm:"type:double precision;not null"`
+	City                string    `json:"city" gorm:"type:varchar(100);not null"`
+	AmountRuleMatched   bool      `json:"amount_rule_matched" gorm:"not null;default:false"`
+	LocationRuleMatched bool      `json:"location_rule_matched" gorm:"not null;default:false"`
+	VelocityRuleMatched bool      `json:"velocity_rule_matched" gorm:"not null;default:false"`
+	FraudStatus         bool      `json:"fraud_status" gorm:"not null;default:false;index"`
+	CreatedAt           time.Time `json:"created_at" gorm:"not null;default:now()"`
 }
 
 func (t *Transaction) BeforeCreate(_ *gorm.DB) error {

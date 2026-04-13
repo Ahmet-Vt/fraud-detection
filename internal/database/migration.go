@@ -5,8 +5,6 @@ import (
 	"log"
 	"sort"
 	"time"
-
-	"github.com/Ahmet-Vt/fraud-detection/internal/domain"
 	"gorm.io/gorm"
 )
 
@@ -157,8 +155,4 @@ func (m *Migrator) appliedVersions() (map[string]bool, error) {
 		result[a.Version] = true
 	}
 	return result, nil
-}
-
-func All() []MigrationEntry {
-	return []MigrationEntry{}
 }
