@@ -7,20 +7,31 @@ import (
 )
 
 var CreateTransactionsTable = database.MigrationEntry{
-	Version: "20260413_002",
+	Version: "20260414_002",
 	Name:    "create_transactions_table",
 	Up: func(tx *gorm.DB) error {
+		if err := tx.Exec(`
+			DO $$
+			BEGIN
+				IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'status') THEN
+					CREATE TYPE status AS ENUM ('pending', 'completed', 'failed');
+				END IF;
+			END
+			$$;
+		`).Error; err != nil {
+			return err
+		}
+
 		if err := tx.Exec(`
 			CREATE TABLE transactions (
 				id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 				user_id UUID NOT NULL,
 				amount BIGINT NOT NULL,
-				latitude DOUBLE PRECISION NOT NULL,
-				longitude DOUBLE PRECISION NOT NULL,
 				city VARCHAR(100) NOT NULL,
 				amount_rule_matched BOOLEAN NOT NULL DEFAULT FALSE,
 				location_rule_matched BOOLEAN NOT NULL DEFAULT FALSE,
 				velocity_rule_matched BOOLEAN NOT NULL DEFAULT FALSE,
+				transaction_status status NOT NULL DEFAULT 'pending',
 				fraud_status BOOLEAN NOT NULL DEFAULT FALSE,
 				created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
 				CONSTRAINT fk_transactions_user
@@ -39,6 +50,10 @@ var CreateTransactionsTable = database.MigrationEntry{
 		return tx.Exec(`CREATE INDEX idx_transactions_fraud_status ON transactions(fraud_status)`).Error
 	},
 	Down: func(tx *gorm.DB) error {
-		return tx.Exec(`DROP TABLE IF EXISTS transactions`).Error
+		if err := tx.Exec(`DROP TABLE IF EXISTS transactions`).Error; err != nil {
+			return err
+		}
+
+		return tx.Exec(`DROP TYPE IF EXISTS status`).Error
 	},
 }

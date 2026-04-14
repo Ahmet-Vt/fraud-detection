@@ -7,14 +7,21 @@ import (
 )
 
 var CreateUsersTable = database.MigrationEntry{
-	Version: "20260413_001",
+	Version: "20260414_001",
 	Name: "create_users_table",
 	Up: func(tx *gorm.DB) error {
 		if err := tx.Exec(`CREATE EXTENSION IF NOT EXISTS pgcrypto`).Error; err != nil {
 			return err
 		}
-
-		if err := tx.Exec(`CREATE TYPE user_status AS ENUM ('active', 'suspended', 'deleted')`).Error; err != nil {
+		if err := tx.Exec(`
+			DO $$
+			BEGIN
+				IF NOT EXISTS (SELECT 1 FROM pg_type WHERE typname = 'user_status') THEN
+					CREATE TYPE user_status AS ENUM ('active', 'suspended', 'deleted');
+				END IF;
+			END
+			$$;
+		`).Error; err != nil {
 			return err
 		}
 
@@ -23,7 +30,7 @@ var CreateUsersTable = database.MigrationEntry{
 				id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 				name VARCHAR(100) NOT NULL,
 				surname VARCHAR(100) NOT NULL,
-				email VARCHAR(255) UNIQUE NOT NULL,
+				email VARCHAR(255) UNIQUE,
 				status user_status NOT NULL DEFAULT 'active',
 				created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 			)
