@@ -3,8 +3,10 @@ package main
 import (
 	"log"
 	"net/http"
+
 	"github.com/Ahmet-Vt/fraud-detection/internal/config"
 	"github.com/Ahmet-Vt/fraud-detection/internal/database"
+	"github.com/Ahmet-Vt/fraud-detection/internal/user"
 	"github.com/Ahmet-Vt/fraud-detection/migrations"
 	"github.com/gin-gonic/gin"
 )
@@ -25,6 +27,10 @@ func main() {
 	if err := migrator.Run(); err != nil {
 		log.Fatal("migrations failed: ", err)
 	}
+
+	userRepository := user.NewRepository(db)
+	userService := user.NewService(userRepository)
+	userHandler := user.NewHandler(userService)
 
 	router := gin.Default()
 
@@ -47,5 +53,9 @@ func main() {
 		c.JSON(http.StatusOK, gin.H{"postgres": "up"})
 	})
 
-	router.Run()
+	userHandler.RegisterRoutes(router)
+
+	if err := router.Run(); err != nil {
+		log.Fatal("failed to start server: ", err)
+	}
 }
