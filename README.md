@@ -59,12 +59,6 @@ After starting the API, open:
 
 This page shows all documented endpoints, request bodies, response models, and status codes.
 
-If you change handler annotations later, regenerate the docs with:
-
-```bash
-$(go env GOPATH)/bin/swag init -g cmd/api/main.go -o docs
-```
-
 ## Available Make Commands
 
 | Command | Description |
