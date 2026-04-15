@@ -2,16 +2,24 @@ package main
 
 import (
 	"log"
-	"net/http"
 
+	_ "github.com/Ahmet-Vt/fraud-detection/docs"
 	"github.com/Ahmet-Vt/fraud-detection/internal/config"
 	"github.com/Ahmet-Vt/fraud-detection/internal/database"
-	"github.com/Ahmet-Vt/fraud-detection/internal/user"
 	"github.com/Ahmet-Vt/fraud-detection/internal/transaction"
+	"github.com/Ahmet-Vt/fraud-detection/internal/user"
 	"github.com/Ahmet-Vt/fraud-detection/migrations"
 	"github.com/gin-gonic/gin"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
+// @title Fraud Detection API
+// @version 1.0
+// @description HTTP API for the fraud detection backend.
+// @host localhost:8080
+// @BasePath /
+// @schemes http
 func main() {
 	cfg := config.Load()
 
@@ -38,31 +46,16 @@ func main() {
 	transactionService := transaction.NewService(transactionRepository)
 	transactionHandler := transaction.NewHandler(transactionService)
 
-	
 	router := gin.Default()
-	
-	router.GET("/ping", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"message": "pong",
-		})
-	})
-	
-	router.GET("/health", func(c *gin.Context) {
-		sqlDB, err := db.DB()
-		if err != nil {
-			c.JSON(http.StatusServiceUnavailable, gin.H{"postgres": "error: " + err.Error()})
-			return
-		}
-		if err := sqlDB.Ping(); err != nil {
-			c.JSON(http.StatusServiceUnavailable, gin.H{"postgres": "down: " + err.Error()})
-			return
-		}
-		c.JSON(http.StatusOK, gin.H{"postgres": "up"})
-	})
-	
+
+	router.GET("/ping", pingHandler)
+	router.GET("/health", healthHandler(db))
+
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+
 	userHandler.RegisterRoutes(router)
 	transactionHandler.RegisterRoutes(router)
-	
+
 	if err := router.Run(); err != nil {
 		log.Fatal("failed to start server: ", err)
 	}

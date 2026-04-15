@@ -1,0 +1,501 @@
+basePath: /
+definitions:
+  apidoc.InternalServerError:
+    properties:
+      code:
+        example: INTERNAL_ERROR
+        type: string
+        x-order: "0"
+      error:
+        example: an unexpected error occurred
+        type: string
+        x-order: "1"
+    type: object
+  apidoc.InvalidRequestBodyError:
+    properties:
+      code:
+        example: INVALID_REQUEST_BODY
+        type: string
+        x-order: "0"
+      error:
+        example: invalid request body
+        type: string
+        x-order: "1"
+    type: object
+  apidoc.InvalidTransactionIDError:
+    properties:
+      code:
+        example: INVALID_TRANSACTION_ID
+        type: string
+        x-order: "0"
+      error:
+        example: invalid transaction id
+        type: string
+        x-order: "1"
+    type: object
+  apidoc.InvalidUserIDError:
+    properties:
+      code:
+        example: INVALID_USER_ID
+        type: string
+        x-order: "0"
+      error:
+        example: invalid user id
+        type: string
+        x-order: "1"
+    type: object
+  apidoc.ReferencedUserNotExistsError:
+    properties:
+      code:
+        example: USER_NOT_EXISTS
+        type: string
+        x-order: "0"
+      error:
+        example: referenced user does not exist
+        type: string
+        x-order: "1"
+    type: object
+  apidoc.TransactionAlreadyExistsError:
+    properties:
+      code:
+        example: TRANSACTION_ALREADY_EXISTS
+        type: string
+        x-order: "0"
+      error:
+        example: transaction already exists
+        type: string
+        x-order: "1"
+    type: object
+  apidoc.TransactionNotFoundError:
+    properties:
+      code:
+        example: TRANSACTION_NOT_FOUND
+        type: string
+        x-order: "0"
+      error:
+        example: transaction not found
+        type: string
+        x-order: "1"
+    type: object
+  apidoc.UserAlreadyExistsError:
+    properties:
+      code:
+        example: USER_ALREADY_EXISTS
+        type: string
+        x-order: "0"
+      error:
+        example: user already exists
+        type: string
+        x-order: "1"
+    type: object
+  apidoc.UserNotFoundError:
+    properties:
+      code:
+        example: USER_NOT_FOUND
+        type: string
+        x-order: "0"
+      error:
+        example: user not found
+        type: string
+        x-order: "1"
+    type: object
+  domain.UserStatus:
+    enum:
+    - active
+    - suspended
+    - deleted
+    type: string
+    x-enum-varnames:
+    - UserStatusActive
+    - UserStatusSuspended
+    - UserStatusDeleted
+  main.healthDownResponse:
+    properties:
+      postgres:
+        example: down
+        type: string
+        x-order: "0"
+    type: object
+  main.healthUpResponse:
+    properties:
+      postgres:
+        example: up
+        type: string
+        x-order: "0"
+    type: object
+  main.pingResponse:
+    properties:
+      message:
+        example: pong
+        type: string
+        x-order: "0"
+    type: object
+  transaction.CreateTransactionRequest:
+    properties:
+      amount:
+        example: 5000
+        minimum: 1
+        type: integer
+        x-order: "1"
+      city:
+        example: Istanbul
+        maxLength: 100
+        type: string
+        x-order: "2"
+      user_id:
+        example: 4ca5e74c-3a07-4010-9f07-14e90a35868b
+        format: uuid
+        type: string
+        x-order: "0"
+    required:
+    - amount
+    - city
+    - user_id
+    type: object
+  transaction.TransactionResponse:
+    properties:
+      amount:
+        example: 5000
+        type: integer
+        x-order: "2"
+      city:
+        example: Istanbul
+        type: string
+        x-order: "3"
+      id:
+        example: 1dc90ef0-76a0-4cb2-891e-5193c60aa82f
+        format: uuid
+        type: string
+        x-order: "0"
+      user_id:
+        example: 4ca5e74c-3a07-4010-9f07-14e90a35868b
+        format: uuid
+        type: string
+        x-order: "1"
+    type: object
+  user.CreateUserRequest:
+    properties:
+      email:
+        example: ahmet@example.com
+        type: string
+        x-order: "2"
+      name:
+        example: Ahmet
+        maxLength: 100
+        type: string
+        x-order: "0"
+      status:
+        enum:
+        - active
+        - suspended
+        - deleted
+        example: active
+        type: string
+        x-order: "3"
+      surname:
+        example: Vt
+        maxLength: 100
+        type: string
+        x-order: "1"
+    required:
+    - name
+    - status
+    - surname
+    type: object
+  user.UserResponse:
+    properties:
+      created_at:
+        example: "2026-04-15T19:00:00Z"
+        format: date-time
+        type: string
+        x-order: "5"
+      email:
+        example: ahmet@example.com
+        type: string
+        x-order: "3"
+      id:
+        example: 4ca5e74c-3a07-4010-9f07-14e90a35868b
+        format: uuid
+        type: string
+        x-order: "0"
+      name:
+        example: Ahmet
+        type: string
+        x-order: "1"
+      status:
+        allOf:
+        - $ref: '#/definitions/domain.UserStatus'
+        enum:
+        - active
+        - suspended
+        - deleted
+        example: active
+        x-order: "4"
+      surname:
+        example: Vt
+        type: string
+        x-order: "2"
+    type: object
+host: localhost:8080
+info:
+  contact: {}
+  description: HTTP API for the fraud detection backend.
+  title: Fraud Detection API
+  version: "1.0"
+paths:
+  /health:
+    get:
+      description: Checks PostgreSQL connectivity.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.healthUpResponse'
+        "503":
+          description: Service Unavailable
+          schema:
+            $ref: '#/definitions/main.healthDownResponse'
+      summary: Check API health
+      tags:
+      - system
+  /ping:
+    get:
+      description: Returns a simple pong response.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.pingResponse'
+      summary: Ping the API
+      tags:
+      - system
+  /transactions:
+    get:
+      description: Returns all transactions in deterministic order.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/transaction.TransactionResponse'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apidoc.InternalServerError'
+      summary: List transactions
+      tags:
+      - transactions
+    post:
+      consumes:
+      - application/json
+      description: Creates a new transaction for a user.
+      parameters:
+      - description: Create transaction payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/transaction.CreateTransactionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/transaction.TransactionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apidoc.ReferencedUserNotExistsError'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/apidoc.TransactionAlreadyExistsError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apidoc.InternalServerError'
+      summary: Create transaction
+      tags:
+      - transactions
+  /transactions/{id}:
+    delete:
+      description: Deletes a transaction by UUID.
+      parameters:
+      - description: Transaction ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apidoc.InvalidTransactionIDError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/apidoc.TransactionNotFoundError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apidoc.InternalServerError'
+      summary: Delete transaction
+      tags:
+      - transactions
+    get:
+      description: Returns a single transaction by UUID.
+      parameters:
+      - description: Transaction ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/transaction.TransactionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apidoc.InvalidTransactionIDError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/apidoc.TransactionNotFoundError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apidoc.InternalServerError'
+      summary: Get transaction by ID
+      tags:
+      - transactions
+  /transactions/user/{id}:
+    get:
+      description: Returns transactions for a specific user UUID.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/transaction.TransactionResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apidoc.InvalidUserIDError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apidoc.InternalServerError'
+      summary: List transactions by user
+      tags:
+      - transactions
+  /users:
+    get:
+      description: Returns all users in deterministic order.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/user.UserResponse'
+            type: array
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apidoc.InternalServerError'
+      summary: List users
+      tags:
+      - users
+    post:
+      consumes:
+      - application/json
+      description: Creates a new user.
+      parameters:
+      - description: Create user payload
+        in: body
+        name: payload
+        required: true
+        schema:
+          $ref: '#/definitions/user.CreateUserRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/user.UserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apidoc.InvalidRequestBodyError'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/apidoc.UserAlreadyExistsError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apidoc.InternalServerError'
+      summary: Create user
+      tags:
+      - users
+  /users/{id}:
+    get:
+      description: Returns a single user by UUID.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/user.UserResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apidoc.InvalidUserIDError'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/apidoc.UserNotFoundError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apidoc.InternalServerError'
+      summary: Get user by ID
+      tags:
+      - users
+schemes:
+- http
+swagger: "2.0"

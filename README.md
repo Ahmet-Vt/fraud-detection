@@ -51,6 +51,20 @@ make daemon
 
 The API listens on `http://localhost:8080`.
 
+## Swagger
+
+After starting the API, open:
+
+`http://localhost:8080/swagger/index.html`
+
+This page shows all documented endpoints, request bodies, response models, and status codes.
+
+If you change handler annotations later, regenerate the docs with:
+
+```bash
+$(go env GOPATH)/bin/swag init -g cmd/api/main.go -o docs
+```
+
 ## Available Make Commands
 
 | Command | Description |
@@ -78,6 +92,11 @@ On startup the API:
 | `POST` | `/users` | Creates a user |
 | `GET` | `/users` | Returns all users |
 | `GET` | `/users/:id` | Returns a user by UUID |
+| `POST` | `/transactions` | Creates a transaction |
+| `GET` | `/transactions` | Returns all transactions |
+| `GET` | `/transactions/:id` | Returns a transaction by UUID |
+| `GET` | `/transactions/user/:id` | Returns transactions for a user |
+| `DELETE` | `/transactions/:id` | Deletes a transaction |
 
 ### Create User Request
 

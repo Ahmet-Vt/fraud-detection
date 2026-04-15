@@ -1,0 +1,718 @@
+{
+    "schemes": [
+        "http"
+    ],
+    "swagger": "2.0",
+    "info": {
+        "description": "HTTP API for the fraud detection backend.",
+        "title": "Fraud Detection API",
+        "contact": {},
+        "version": "1.0"
+    },
+    "host": "localhost:8080",
+    "basePath": "/",
+    "paths": {
+        "/health": {
+            "get": {
+                "description": "Checks PostgreSQL connectivity.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system"
+                ],
+                "summary": "Check API health",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.healthUpResponse"
+                        }
+                    },
+                    "503": {
+                        "description": "Service Unavailable",
+                        "schema": {
+                            "$ref": "#/definitions/main.healthDownResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/ping": {
+            "get": {
+                "description": "Returns a simple pong response.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "system"
+                ],
+                "summary": "Ping the API",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/main.pingResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/transactions": {
+            "get": {
+                "description": "Returns all transactions in deterministic order.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "transactions"
+                ],
+                "summary": "List transactions",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/transaction.TransactionResponse"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apidoc.InternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Creates a new transaction for a user.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "transactions"
+                ],
+                "summary": "Create transaction",
+                "parameters": [
+                    {
+                        "description": "Create transaction payload",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/transaction.CreateTransactionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/transaction.TransactionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apidoc.ReferencedUserNotExistsError"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/apidoc.TransactionAlreadyExistsError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apidoc.InternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/transactions/user/{id}": {
+            "get": {
+                "description": "Returns transactions for a specific user UUID.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "transactions"
+                ],
+                "summary": "List transactions by user",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/transaction.TransactionResponse"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apidoc.InvalidUserIDError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apidoc.InternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/transactions/{id}": {
+            "get": {
+                "description": "Returns a single transaction by UUID.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "transactions"
+                ],
+                "summary": "Get transaction by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Transaction ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/transaction.TransactionResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apidoc.InvalidTransactionIDError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apidoc.TransactionNotFoundError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apidoc.InternalServerError"
+                        }
+                    }
+                }
+            },
+            "delete": {
+                "description": "Deletes a transaction by UUID.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "transactions"
+                ],
+                "summary": "Delete transaction",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Transaction ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "204": {
+                        "description": "No Content"
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apidoc.InvalidTransactionIDError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apidoc.TransactionNotFoundError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apidoc.InternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/users": {
+            "get": {
+                "description": "Returns all users in deterministic order.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "List users",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/user.UserResponse"
+                            }
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apidoc.InternalServerError"
+                        }
+                    }
+                }
+            },
+            "post": {
+                "description": "Creates a new user.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Create user",
+                "parameters": [
+                    {
+                        "description": "Create user payload",
+                        "name": "payload",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/user.CreateUserRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "201": {
+                        "description": "Created",
+                        "schema": {
+                            "$ref": "#/definitions/user.UserResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apidoc.InvalidRequestBodyError"
+                        }
+                    },
+                    "409": {
+                        "description": "Conflict",
+                        "schema": {
+                            "$ref": "#/definitions/apidoc.UserAlreadyExistsError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apidoc.InternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/users/{id}": {
+            "get": {
+                "description": "Returns a single user by UUID.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "users"
+                ],
+                "summary": "Get user by ID",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/user.UserResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apidoc.InvalidUserIDError"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/apidoc.UserNotFoundError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apidoc.InternalServerError"
+                        }
+                    }
+                }
+            }
+        }
+    },
+    "definitions": {
+        "apidoc.InternalServerError": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "x-order": "0",
+                    "example": "INTERNAL_ERROR"
+                },
+                "error": {
+                    "type": "string",
+                    "x-order": "1",
+                    "example": "an unexpected error occurred"
+                }
+            }
+        },
+        "apidoc.InvalidRequestBodyError": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "x-order": "0",
+                    "example": "INVALID_REQUEST_BODY"
+                },
+                "error": {
+                    "type": "string",
+                    "x-order": "1",
+                    "example": "invalid request body"
+                }
+            }
+        },
+        "apidoc.InvalidTransactionIDError": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "x-order": "0",
+                    "example": "INVALID_TRANSACTION_ID"
+                },
+                "error": {
+                    "type": "string",
+                    "x-order": "1",
+                    "example": "invalid transaction id"
+                }
+            }
+        },
+        "apidoc.InvalidUserIDError": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "x-order": "0",
+                    "example": "INVALID_USER_ID"
+                },
+                "error": {
+                    "type": "string",
+                    "x-order": "1",
+                    "example": "invalid user id"
+                }
+            }
+        },
+        "apidoc.ReferencedUserNotExistsError": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "x-order": "0",
+                    "example": "USER_NOT_EXISTS"
+                },
+                "error": {
+                    "type": "string",
+                    "x-order": "1",
+                    "example": "referenced user does not exist"
+                }
+            }
+        },
+        "apidoc.TransactionAlreadyExistsError": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "x-order": "0",
+                    "example": "TRANSACTION_ALREADY_EXISTS"
+                },
+                "error": {
+                    "type": "string",
+                    "x-order": "1",
+                    "example": "transaction already exists"
+                }
+            }
+        },
+        "apidoc.TransactionNotFoundError": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "x-order": "0",
+                    "example": "TRANSACTION_NOT_FOUND"
+                },
+                "error": {
+                    "type": "string",
+                    "x-order": "1",
+                    "example": "transaction not found"
+                }
+            }
+        },
+        "apidoc.UserAlreadyExistsError": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "x-order": "0",
+                    "example": "USER_ALREADY_EXISTS"
+                },
+                "error": {
+                    "type": "string",
+                    "x-order": "1",
+                    "example": "user already exists"
+                }
+            }
+        },
+        "apidoc.UserNotFoundError": {
+            "type": "object",
+            "properties": {
+                "code": {
+                    "type": "string",
+                    "x-order": "0",
+                    "example": "USER_NOT_FOUND"
+                },
+                "error": {
+                    "type": "string",
+                    "x-order": "1",
+                    "example": "user not found"
+                }
+            }
+        },
+        "domain.UserStatus": {
+            "type": "string",
+            "enum": [
+                "active",
+                "suspended",
+                "deleted"
+            ],
+            "x-enum-varnames": [
+                "UserStatusActive",
+                "UserStatusSuspended",
+                "UserStatusDeleted"
+            ]
+        },
+        "main.healthDownResponse": {
+            "type": "object",
+            "properties": {
+                "postgres": {
+                    "type": "string",
+                    "x-order": "0",
+                    "example": "down"
+                }
+            }
+        },
+        "main.healthUpResponse": {
+            "type": "object",
+            "properties": {
+                "postgres": {
+                    "type": "string",
+                    "x-order": "0",
+                    "example": "up"
+                }
+            }
+        },
+        "main.pingResponse": {
+            "type": "object",
+            "properties": {
+                "message": {
+                    "type": "string",
+                    "x-order": "0",
+                    "example": "pong"
+                }
+            }
+        },
+        "transaction.CreateTransactionRequest": {
+            "type": "object",
+            "required": [
+                "amount",
+                "city",
+                "user_id"
+            ],
+            "properties": {
+                "user_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "x-order": "0",
+                    "example": "4ca5e74c-3a07-4010-9f07-14e90a35868b"
+                },
+                "amount": {
+                    "type": "integer",
+                    "minimum": 1,
+                    "x-order": "1",
+                    "example": 5000
+                },
+                "city": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "x-order": "2",
+                    "example": "Istanbul"
+                }
+            }
+        },
+        "transaction.TransactionResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "x-order": "0",
+                    "example": "1dc90ef0-76a0-4cb2-891e-5193c60aa82f"
+                },
+                "user_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "x-order": "1",
+                    "example": "4ca5e74c-3a07-4010-9f07-14e90a35868b"
+                },
+                "amount": {
+                    "type": "integer",
+                    "x-order": "2",
+                    "example": 5000
+                },
+                "city": {
+                    "type": "string",
+                    "x-order": "3",
+                    "example": "Istanbul"
+                }
+            }
+        },
+        "user.CreateUserRequest": {
+            "type": "object",
+            "required": [
+                "name",
+                "status",
+                "surname"
+            ],
+            "properties": {
+                "name": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "x-order": "0",
+                    "example": "Ahmet"
+                },
+                "surname": {
+                    "type": "string",
+                    "maxLength": 100,
+                    "x-order": "1",
+                    "example": "Vt"
+                },
+                "email": {
+                    "type": "string",
+                    "x-order": "2",
+                    "example": "ahmet@example.com"
+                },
+                "status": {
+                    "type": "string",
+                    "enum": [
+                        "active",
+                        "suspended",
+                        "deleted"
+                    ],
+                    "x-order": "3",
+                    "example": "active"
+                }
+            }
+        },
+        "user.UserResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "x-order": "0",
+                    "example": "4ca5e74c-3a07-4010-9f07-14e90a35868b"
+                },
+                "name": {
+                    "type": "string",
+                    "x-order": "1",
+                    "example": "Ahmet"
+                },
+                "surname": {
+                    "type": "string",
+                    "x-order": "2",
+                    "example": "Vt"
+                },
+                "email": {
+                    "type": "string",
+                    "x-order": "3",
+                    "example": "ahmet@example.com"
+                },
+                "status": {
+                    "enum": [
+                        "active",
+                        "suspended",
+                        "deleted"
+                    ],
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/domain.UserStatus"
+                        }
+                    ],
+                    "x-order": "4",
+                    "example": "active"
+                },
+                "created_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "x-order": "5",
+                    "example": "2026-04-15T19:00:00Z"
+                }
+            }
+        }
+    }
+}

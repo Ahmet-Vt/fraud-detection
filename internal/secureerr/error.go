@@ -8,8 +8,8 @@ import (
 
 
 type Error struct {
-	Code     string            `json:"code"`
-	UserMsg  string            `json:"error"`
+	Code     string            `json:"code" example:"USER_NOT_FOUND"`
+	UserMsg  string            `json:"error" example:"user not found"`
 	Status   int               `json:"-"`
 	Internal error             `json:"-"`
 	Metadata map[string]string `json:"-"`
