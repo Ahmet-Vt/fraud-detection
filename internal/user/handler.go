@@ -4,6 +4,7 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/Ahmet-Vt/fraud-detection/internal/domain"
 	"github.com/Ahmet-Vt/fraud-detection/internal/secureerr"
@@ -20,6 +21,15 @@ type createUserRequest struct {
 	Surname string  `json:"surname" binding:"required,max=100"`
 	Email   *string `json:"email" binding:"omitempty,email"`
 	Status  string  `json:"status" binding:"required,oneof=active suspended deleted"`
+}
+
+type userResponse struct {
+	ID        uuid.UUID         `json:"id"`
+	Name      string            `json:"name"`
+	Surname   string            `json:"surname"`
+	Email     *string           `json:"email,omitempty"`
+	Status    domain.UserStatus `json:"status"`
+	CreatedAt time.Time         `json:"created_at"`
 }
 
 func NewHandler(service *Service) *Handler {
@@ -56,7 +66,7 @@ func (h *Handler) CreateUser(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusCreated, user)
+	c.JSON(http.StatusCreated, toUserResponse(user))
 }
 
 func (h *Handler) GetUserByID(c *gin.Context) {
@@ -77,7 +87,7 @@ func (h *Handler) GetUserByID(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, user)
+	c.JSON(http.StatusOK, toUserResponse(user))
 }
 
 func (h *Handler) GetAllUsers(c *gin.Context) {
@@ -87,7 +97,7 @@ func (h *Handler) GetAllUsers(c *gin.Context) {
 		return
 	}
 
-	c.JSON(http.StatusOK, users)
+	c.JSON(http.StatusOK, toUserResponses(users))
 }
 
 func (h *Handler) mapError(err error) *secureerr.Error {
@@ -110,4 +120,23 @@ func (h *Handler) writeError(c *gin.Context, appErr *secureerr.Error) {
 		"code":  appErr.Code,
 		"error": appErr.Error(),
 	})
+}
+
+func toUserResponse(u *domain.User) userResponse {
+	return userResponse{
+		ID:        u.ID,
+		Name:      u.Name,
+		Surname:   u.Surname,
+		Email:     u.Email,
+		Status:    u.UserStatus,
+		CreatedAt: u.CreatedAt,
+	}
+}
+
+func toUserResponses(users []*domain.User) []userResponse {
+	responses := make([]userResponse, 0, len(users))
+	for _, u := range users {
+		responses = append(responses, toUserResponse(u))
+	}
+	return responses
 }

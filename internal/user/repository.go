@@ -48,7 +48,7 @@ func (r *Repository) FindByID(id uuid.UUID) (*domain.User, error) {
 
 func (r *Repository) FindAll() ([]*domain.User, error) {
 	var users []*domain.User
-	if err := r.db.Find(&users).Error; err != nil {
+	if err := r.db.Order("created_at DESC").Find(&users).Error; err != nil {
 		return nil, fmt.Errorf("find all users: %w", err)
 	}
 	return users, nil

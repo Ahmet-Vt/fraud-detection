@@ -7,6 +7,7 @@ import (
 	"github.com/Ahmet-Vt/fraud-detection/internal/config"
 	"github.com/Ahmet-Vt/fraud-detection/internal/database"
 	"github.com/Ahmet-Vt/fraud-detection/internal/user"
+	"github.com/Ahmet-Vt/fraud-detection/internal/transaction"
 	"github.com/Ahmet-Vt/fraud-detection/migrations"
 	"github.com/gin-gonic/gin"
 )
@@ -32,14 +33,20 @@ func main() {
 	userService := user.NewService(userRepository)
 	userHandler := user.NewHandler(userService)
 
-	router := gin.Default()
 
+	transactionRepository := transaction.NewRepository(db)
+	transactionService := transaction.NewService(transactionRepository)
+	transactionHandler := transaction.NewHandler(transactionService)
+
+	
+	router := gin.Default()
+	
 	router.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
 			"message": "pong",
 		})
 	})
-
+	
 	router.GET("/health", func(c *gin.Context) {
 		sqlDB, err := db.DB()
 		if err != nil {
@@ -52,9 +59,10 @@ func main() {
 		}
 		c.JSON(http.StatusOK, gin.H{"postgres": "up"})
 	})
-
+	
 	userHandler.RegisterRoutes(router)
-
+	transactionHandler.RegisterRoutes(router)
+	
 	if err := router.Run(); err != nil {
 		log.Fatal("failed to start server: ", err)
 	}

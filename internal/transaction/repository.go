@@ -31,6 +31,9 @@ func (r *Repository) Create(transaction *domain.Transaction) error {
 		if isUniqueViolation(err) {
 			return fmt.Errorf("create transaction: %w", errors.Join(ErrTransactionAlreadyExists, err))
 		}
+		if isForeignKeyViolation(err) {
+			return fmt.Errorf("create transaction: %w", errors.Join(ErrUserNotExists, err))
+		}
 		return fmt.Errorf("create transaction: %w", err)
 	}
 	return nil
@@ -49,7 +52,7 @@ func (r *Repository) FindByID(id uuid.UUID) (*domain.Transaction, error) {
 
 func (r *Repository) FindAll() ([]*domain.Transaction, error) {
 	var transactions []*domain.Transaction
-	if err := r.db.Find(&transactions).Error; err != nil {
+	if err := r.db.Order("created_at DESC").Find(&transactions).Error; err != nil {
 		return nil, fmt.Errorf("find all transactions: %w", err)
 	}
 	return transactions, nil
@@ -57,7 +60,7 @@ func (r *Repository) FindAll() ([]*domain.Transaction, error) {
 
 func (r *Repository) FindByUserID(userID uuid.UUID) ([]*domain.Transaction, error) {
 	var transactions []*domain.Transaction
-	if err := r.db.Where("user_id = ?", userID).Order("created_at DESC").Find(&transactions).Error; err != nil {
+	if err := r.db.Where("user_id = ?", userID).Find(&transactions).Error; err != nil {
 		return nil, fmt.Errorf("find transactions by user id: %w", err)
 	}
 	return transactions, nil
@@ -77,4 +80,9 @@ func (r *Repository) Delete(id uuid.UUID) error {
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
 	return errors.As(err, &pgErr) && pgErr.Code == "23505"
+}
+
+func isForeignKeyViolation(err error) bool {
+	var pgErr *pgconn.PgError
+	return errors.As(err, &pgErr) && pgErr.Code == "23503"
 }
