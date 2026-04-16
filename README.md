@@ -9,7 +9,7 @@ The current codebase includes:
 - `user` module with layered `handler -> service -> repository` flow
 - safe/public vs internal error separation via `internal/secureerr`
 
-Redis and Kafka are present in `docker-compose.yml` for future work, but they are not wired into the application flow yet.
+Redis and RabbitMQ are provisioned in `docker-compose.yml`. PostgreSQL is fully wired into the application, and RabbitMQ currently has only a startup connection check/bootstrap client.
 
 ## Prerequisites
 
@@ -51,6 +51,8 @@ make daemon
 
 The API listens on `http://localhost:8080`.
 
+RabbitMQ management UI is available at `http://localhost:15672` with the default `guest/guest` credentials from the example environment.
+
 ## Swagger
 
 After starting the API, open:
@@ -74,8 +76,9 @@ On startup the API:
 1. Loads configuration from environment variables.
 2. Connects to PostgreSQL.
 3. Registers and runs migrations.
-4. Wires the `user` repository, service, and handler.
-5. Starts the Gin HTTP server.
+4. Connects to RabbitMQ.
+5. Wires the `user` and `transaction` modules.
+6. Starts the Gin HTTP server.
 
 ## API Endpoints
 
@@ -174,7 +177,6 @@ Docker Compose currently provisions:
 
 - PostgreSQL 16
 - Redis 7
-- Kafka
-- Zookeeper
+- RabbitMQ 4 with the management plugin
 
-At the moment, only PostgreSQL is used by the running API.
+At the moment, PostgreSQL is used by the running API, and RabbitMQ is only connected during startup.

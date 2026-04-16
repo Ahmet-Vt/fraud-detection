@@ -18,28 +18,15 @@ services:
     ports:
       - "${REDIS_PORT}:6379"
 
-  zookeeper:
-    image: confluentinc/cp-zookeeper:7.6.0
-    container_name: fraud-zookeeper
-    environment:
-      ZOOKEEPER_CLIENT_PORT: ${ZOOKEEPER_CLIENT_PORT}
-      ZOOKEEPER_TICK_TIME: ${ZOOKEEPER_TICK_TIME}
-
-  kafka:
-    image: confluentinc/cp-kafka:7.6.0
-    container_name: fraud-kafka
-    depends_on:
-      - zookeeper
+  rabbitmq:
+    image: rabbitmq:4-management-alpine
+    container_name: fraud-rabbitmq
     ports:
-      - "${KAFKA_OUTSIDE_PORT}:9094"
-    environment:
-      KAFKA_BROKER_ID: ${KAFKA_BROKER_ID}
-      KAFKA_ZOOKEEPER_CONNECT: ${KAFKA_ZOOKEEPER_CONNECT}
-      KAFKA_LISTENERS: INTERNAL://0.0.0.0:${KAFKA_INTERNAL_PORT},OUTSIDE://0.0.0.0:9094
-      KAFKA_ADVERTISED_LISTENERS: INTERNAL://kafka:${KAFKA_INTERNAL_PORT},OUTSIDE://${KAFKA_ADVERTISED_HOST}:${KAFKA_OUTSIDE_PORT}
-      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: ${KAFKA_LISTENER_SECURITY_PROTOCOL_MAP}
-      KAFKA_INTER_BROKER_LISTENER_NAME: ${KAFKA_INTER_BROKER_LISTENER_NAME}
-      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: ${KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR}
+      - "${RABBITMQ_PORT}:5672"
+      - "${RABBITMQ_MANAGEMENT_PORT}:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
 
 volumes:
   postgres_data:
+  rabbitmq_data:

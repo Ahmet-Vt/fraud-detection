@@ -6,6 +6,7 @@ import (
 	_ "github.com/Ahmet-Vt/fraud-detection/docs"
 	"github.com/Ahmet-Vt/fraud-detection/internal/config"
 	"github.com/Ahmet-Vt/fraud-detection/internal/database"
+	"github.com/Ahmet-Vt/fraud-detection/internal/messaging/rabbitmq"
 	"github.com/Ahmet-Vt/fraud-detection/internal/transaction"
 	"github.com/Ahmet-Vt/fraud-detection/internal/user"
 	"github.com/Ahmet-Vt/fraud-detection/migrations"
@@ -37,10 +38,19 @@ func main() {
 		log.Fatal("migrations failed: ", err)
 	}
 
+	rabbitMQClient, err := rabbitmq.New(cfg.RabbitMQ.URL)
+	if err != nil {
+		log.Fatal("failed to connect rabbitmq: ", err)
+	}
+	defer func() {
+		if err := rabbitMQClient.Close(); err != nil {
+			log.Printf("failed to close rabbitmq client: %v", err)
+		}
+	}()
+
 	userRepository := user.NewRepository(db)
 	userService := user.NewService(userRepository)
 	userHandler := user.NewHandler(userService)
-
 
 	transactionRepository := transaction.NewRepository(db)
 	transactionService := transaction.NewService(transactionRepository)

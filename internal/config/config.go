@@ -17,6 +17,10 @@ type DBConfig struct {
 	DBSSLMode  string
 }
 
+type RabbitMQConfig struct {
+	URL string
+}
+
 func (c DBConfig) DSN() string {
 	return fmt.Sprintf(
 		"host=%s port=%s user=%s password=%s dbname=%s sslmode=%s",
@@ -30,7 +34,8 @@ func (c DBConfig) DSN() string {
 }
 
 type AppConfig struct {
-	DB DBConfig
+	DB       DBConfig
+	RabbitMQ RabbitMQConfig
 }
 
 func Load() AppConfig {
@@ -53,6 +58,9 @@ func loadConfig() AppConfig {
 			DBPassword: requireEnv("POSTGRES_PASSWORD"),
 			DBName:     requireEnv("POSTGRES_DB"),
 			DBSSLMode:  requireEnv("POSTGRES_SSLMODE"),
+		},
+		RabbitMQ: RabbitMQConfig{
+			URL: requireEnv("RABBITMQ_URL"),
 		},
 	}
 }
