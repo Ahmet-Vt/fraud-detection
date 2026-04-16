@@ -38,7 +38,7 @@ func main() {
 		log.Fatal("migrations failed: ", err)
 	}
 
-	rabbitMQClient, err := rabbitmq.New(cfg.RabbitMQ.URL)
+	rabbitMQClient, err := rabbitmq.New(cfg.RabbitMQ.AMQPURL())
 	if err != nil {
 		log.Fatal("failed to connect rabbitmq: ", err)
 	}
@@ -58,8 +58,7 @@ func main() {
 
 	router := gin.Default()
 
-	router.GET("/ping", pingHandler)
-	router.GET("/health", healthHandler(db))
+	router.GET("/health", healthHandler(db, rabbitMQClient))
 
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 

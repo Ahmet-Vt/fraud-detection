@@ -17,7 +17,7 @@ const docTemplate = `{
     "paths": {
         "/health": {
             "get": {
-                "description": "Checks PostgreSQL connectivity.",
+                "description": "Checks PostgreSQL and RabbitMQ connectivity.",
                 "produces": [
                     "application/json"
                 ],
@@ -36,26 +36,6 @@ const docTemplate = `{
                         "description": "Service Unavailable",
                         "schema": {
                             "$ref": "#/definitions/main.healthDownResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/ping": {
-            "get": {
-                "description": "Returns a simple pong response.",
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "system"
-                ],
-                "summary": "Ping the API",
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/main.pingResponse"
                         }
                     }
                 }
@@ -556,6 +536,11 @@ const docTemplate = `{
                     "type": "string",
                     "x-order": "0",
                     "example": "down"
+                },
+                "rabbitmq": {
+                    "type": "string",
+                    "x-order": "1",
+                    "example": "down"
                 }
             }
         },
@@ -566,16 +551,11 @@ const docTemplate = `{
                     "type": "string",
                     "x-order": "0",
                     "example": "up"
-                }
-            }
-        },
-        "main.pingResponse": {
-            "type": "object",
-            "properties": {
-                "message": {
+                },
+                "rabbitmq": {
                     "type": "string",
-                    "x-order": "0",
-                    "example": "pong"
+                    "x-order": "1",
+                    "example": "up"
                 }
             }
         },

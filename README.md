@@ -9,7 +9,7 @@ The current codebase includes:
 - `user` module with layered `handler -> service -> repository` flow
 - safe/public vs internal error separation via `internal/secureerr`
 
-Redis and RabbitMQ are provisioned in `docker-compose.yml`. PostgreSQL is fully wired into the application, and RabbitMQ currently has only a startup connection check/bootstrap client.
+Redis and RabbitMQ are provisioned in `docker-compose.yml`. PostgreSQL is fully wired into the application, and RabbitMQ is used both during startup and in runtime request handling.
 
 ## Prerequisites
 
@@ -51,7 +51,7 @@ make daemon
 
 The API listens on `http://localhost:8080`.
 
-RabbitMQ management UI is available at `http://localhost:15672` with the default `guest/guest` credentials from the example environment.
+RabbitMQ management UI is available at `http://localhost:15672` with the credentials configured in `.env`.
 
 ## Swagger
 
@@ -80,12 +80,13 @@ On startup the API:
 5. Wires the `user` and `transaction` modules.
 6. Starts the Gin HTTP server.
 
+RabbitMQ connection settings are read from `.env` using `RABBITMQ_HOST`, `RABBITMQ_PORT`, `RABBITMQ_USER`, and `RABBITMQ_PASSWORD`.
+
 ## API Endpoints
 
 | Method | Path | Description |
 | --- | --- | --- |
-| `GET` | `/ping` | Returns `{"message":"pong"}` |
-| `GET` | `/health` | Checks PostgreSQL connectivity |
+| `GET` | `/health` | Checks PostgreSQL and RabbitMQ connectivity |
 | `POST` | `/users` | Creates a user |
 | `GET` | `/users` | Returns all users |
 | `GET` | `/users/:id` | Returns a user by UUID |
@@ -179,4 +180,4 @@ Docker Compose currently provisions:
 - Redis 7
 - RabbitMQ 4 with the management plugin
 
-At the moment, PostgreSQL is used by the running API, and RabbitMQ is only connected during startup.
+The running API depends on both PostgreSQL and RabbitMQ.

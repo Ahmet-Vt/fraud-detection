@@ -29,6 +29,23 @@ func (c *Client) Connection() *amqp.Connection {
 	return c.conn
 }
 
+func (c *Client) Ping() error {
+	if c == nil || c.conn == nil {
+		return fmt.Errorf("rabbitmq connection is nil")
+	}
+	if c.conn.IsClosed() {
+		return fmt.Errorf("rabbitmq connection is closed")
+	}
+
+	ch, err := c.conn.Channel()
+	if err != nil {
+		return fmt.Errorf("open rabbitmq channel: %w", err)
+	}
+	defer ch.Close()
+
+	return nil
+}
+
 func (c *Client) Close() error {
 	if c == nil {
 		return nil

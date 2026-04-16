@@ -3,6 +3,8 @@ package config
 import (
 	"fmt"
 	"log"
+	"net"
+	"net/url"
 	"os"
 
 	"github.com/joho/godotenv"
@@ -18,7 +20,19 @@ type DBConfig struct {
 }
 
 type RabbitMQConfig struct {
-	URL string
+	Host     string
+	Port     string
+	User     string
+	Password string
+}
+
+func (c RabbitMQConfig) AMQPURL() string {
+	return (&url.URL{
+		Scheme: "amqp",
+		User:   url.UserPassword(c.User, c.Password),
+		Host:   net.JoinHostPort(c.Host, c.Port),
+		Path:   "/",
+	}).String()
 }
 
 func (c DBConfig) DSN() string {
@@ -60,7 +74,10 @@ func loadConfig() AppConfig {
 			DBSSLMode:  requireEnv("POSTGRES_SSLMODE"),
 		},
 		RabbitMQ: RabbitMQConfig{
-			URL: requireEnv("RABBITMQ_URL"),
+			Host:     requireEnv("RABBITMQ_HOST"),
+			Port:     requireEnv("RABBITMQ_PORT"),
+			User:     requireEnv("RABBITMQ_USER"),
+			Password: requireEnv("RABBITMQ_PASSWORD"),
 		},
 	}
 }
