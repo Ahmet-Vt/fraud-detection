@@ -1,4 +1,4 @@
-package transaction
+package distance
 
 import (
 	"math"
@@ -19,7 +19,7 @@ func HaversineDistance(lat1, lon1, lat2, lon2 float64) float64 {
 
 	haversineTheta := haversineLatDiff + (cosLatRadian1 * cosLatRadian2 * haversineLonDiff)
 
-	centralAngle := 2 * math.Atan2(math.Sqrt(haversineTheta), math.Sqrt(1 - haversineTheta))
+	centralAngle := 2 * math.Atan2(math.Sqrt(haversineTheta), math.Sqrt(1-haversineTheta))
 
 	kmDistance := centralAngle * R
 

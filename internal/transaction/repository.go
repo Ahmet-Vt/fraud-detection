@@ -15,6 +15,7 @@ type RepositoryInterface interface {
 	FindByID(id uuid.UUID) (*domain.Transaction, error)
 	FindAll() ([]*domain.Transaction, error)
 	FindByUserID(userID uuid.UUID) ([]*domain.Transaction, error)
+	GetTripleAmountSumLast24HoursByUserID(userID uuid.UUID) (int64, error)
 	Delete(id uuid.UUID) error
 }
 
@@ -66,6 +67,19 @@ func (r *Repository) FindByUserID(userID uuid.UUID) ([]*domain.Transaction, erro
 	return transactions, nil
 }
 
+func (r *Repository) GetTripleAmountSumLast24HoursByUserID(userID uuid.UUID) (int64, error) {
+	var tripleAmountSum int64
+
+	if err := r.db.Model(&domain.Transaction{}).
+		Select("COALESCE(SUM(amount), 0) * 3").
+		Where("user_id = ? AND created_at >= NOW() - INTERVAL '24 hours'", userID).
+		Scan(&tripleAmountSum).Error; err != nil {
+		return 0, fmt.Errorf("get triple amount sum last 24 hours by user id: %w", err)
+	}
+
+	return tripleAmountSum, nil
+}
+
 func (r *Repository) Delete(id uuid.UUID) error {
 	result := r.db.Delete(&domain.Transaction{}, id)
 	if result.Error != nil {
@@ -76,6 +90,8 @@ func (r *Repository) Delete(id uuid.UUID) error {
 	}
 	return nil
 }
+
+
 
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError
