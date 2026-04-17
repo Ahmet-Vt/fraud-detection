@@ -4,22 +4,28 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"gorm.io/gorm"
 )
 
 type UserStatus string
 type Status string
+type FraudRuleName string
 
 const (
-	TransactionStatusPending Status = "pending"
+	TransactionStatusPending   Status = "pending"
 	TransactionStatusCompleted Status = "completed"
-	TransactionStatusFailed Status = "failed"
+	TransactionStatusFailed    Status = "failed"
 )
 
 const (
-	UserStatusActive   UserStatus = "active"
+	FraudRuleAmount   FraudRuleName = "amount"
+	FraudRuleLocation FraudRuleName = "location"
+	FraudRuleVelocity FraudRuleName = "velocity"
+)
+
+const (
+	UserStatusActive    UserStatus = "active"
 	UserStatusSuspended UserStatus = "suspended"
-	UserStatusDeleted UserStatus = "deleted"
+	UserStatusDeleted   UserStatus = "deleted"
 )
 
 type User struct {
@@ -33,40 +39,32 @@ type User struct {
 }
 
 type Transaction struct {
-	ID                  uuid.UUID `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
-	UserID              uuid.UUID `json:"user_id" gorm:"type:uuid;not null;index"`
-	User                User      `json:"user" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
-	Amount              int64     `json:"amount" gorm:"type:bigint;not null"`
-	City                string    `json:"city" gorm:"type:varchar(100);not null"`
-	AmountRuleMatched   bool      `json:"amount_rule_matched" gorm:"not null;default:false"`
-	LocationRuleMatched bool      `json:"location_rule_matched" gorm:"not null;default:false"`
-	VelocityRuleMatched bool      `json:"velocity_rule_matched" gorm:"not null;default:false"`
-	TransactionStatus   Status    `json:"transaction_status" gorm:"type:status;not null;default:pending"`
-	FraudStatus         bool      `json:"fraud_status" gorm:"not null;default:false;index"`
-	CreatedAt           time.Time `json:"created_at" gorm:"not null;default:now()"`
+	ID                uuid.UUID              `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	UserID            uuid.UUID              `json:"user_id" gorm:"type:uuid;not null;index"`
+	User              User                   `json:"user" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
+	Amount            int64                  `json:"amount" gorm:"type:bigint;not null"`
+	City              string                 `json:"city" gorm:"type:varchar(100);not null"`
+	FraudRules        []TransactionFraudRule `json:"fraud_rules,omitempty" gorm:"foreignKey:TransactionID"`
+	TransactionStatus Status                 `json:"transaction_status" gorm:"type:status;not null;default:pending"`
+	FraudStatus       bool                   `json:"fraud_status" gorm:"not null;default:false;index"`
+	CreatedAt         time.Time              `json:"created_at" gorm:"not null;default:now()"`
 }
 
-func (t *Transaction) BeforeCreate(_ *gorm.DB) error {
-	t.RefreshFraudStatus()
-	return nil
-}
-
-func (t *Transaction) BeforeUpdate(_ *gorm.DB) error {
-	t.RefreshFraudStatus()
-	return nil
+type TransactionFraudRule struct {
+	ID            uuid.UUID     `json:"id" gorm:"type:uuid;default:gen_random_uuid();primaryKey"`
+	TransactionID uuid.UUID     `json:"transaction_id" gorm:"type:uuid;not null;index"`
+	RuleName      FraudRuleName `json:"rule_name" gorm:"type:fraud_rule_name;not null"`
+	Matched       bool          `json:"matched" gorm:"not null;default:false"`
+	CreatedAt     time.Time     `json:"created_at" gorm:"not null;default:now()"`
 }
 
 func (t *Transaction) RefreshFraudStatus() {
 	matchedRules := 0
 
-	if t.AmountRuleMatched {
-		matchedRules++
-	}
-	if t.LocationRuleMatched {
-		matchedRules++
-	}
-	if t.VelocityRuleMatched {
-		matchedRules++
+	for _, fraudRule := range t.FraudRules {
+		if fraudRule.Matched {
+			matchedRules++
+		}
 	}
 
 	t.FraudStatus = matchedRules >= 2

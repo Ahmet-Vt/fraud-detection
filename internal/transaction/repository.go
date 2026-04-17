@@ -12,10 +12,11 @@ import (
 
 type RepositoryInterface interface {
 	Create(transaction *domain.Transaction) error
+	ReplaceFraudRules(transactionID uuid.UUID, rules []domain.TransactionFraudRule) error
 	FindByID(id uuid.UUID) (*domain.Transaction, error)
 	FindAll() ([]*domain.Transaction, error)
 	FindByUserID(userID uuid.UUID) ([]*domain.Transaction, error)
-	GetTripleAmountSumLast24HoursByUserID(userID uuid.UUID) (int64, error)
+	GetTripleAmountAverageLast24HoursByUserID(userID uuid.UUID) (int64, error)
 	Delete(id uuid.UUID) error
 }
 
@@ -40,9 +41,46 @@ func (r *Repository) Create(transaction *domain.Transaction) error {
 	return nil
 }
 
+func (r *Repository) ReplaceFraudRules(transactionID uuid.UUID, rules []domain.TransactionFraudRule) error {
+	return r.db.Transaction(func(tx *gorm.DB) error {
+		normalizedRules := make([]domain.TransactionFraudRule, 0, len(rules))
+		matchedRules := 0
+
+		for _, rule := range rules {
+			rule.TransactionID = transactionID
+			if rule.Matched {
+				matchedRules++
+			}
+			normalizedRules = append(normalizedRules, rule)
+		}
+
+		if err := tx.Where("transaction_id = ?", transactionID).Delete(&domain.TransactionFraudRule{}).Error; err != nil {
+			return fmt.Errorf("replace fraud rules: %w", err)
+		}
+
+		if len(normalizedRules) > 0 {
+			if err := tx.Create(&normalizedRules).Error; err != nil {
+				return fmt.Errorf("replace fraud rules: %w", err)
+			}
+		}
+
+		result := tx.Model(&domain.Transaction{}).
+			Where("id = ?", transactionID).
+			Update("fraud_status", matchedRules >= 2)
+		if result.Error != nil {
+			return fmt.Errorf("replace fraud rules: %w", result.Error)
+		}
+		if result.RowsAffected == 0 {
+			return fmt.Errorf("replace fraud rules: %w", ErrTransactionNotFound)
+		}
+
+		return nil
+	})
+}
+
 func (r *Repository) FindByID(id uuid.UUID) (*domain.Transaction, error) {
 	var transaction domain.Transaction
-	if err := r.db.First(&transaction, id).Error; err != nil {
+	if err := r.db.Preload("FraudRules").First(&transaction, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, fmt.Errorf("find transaction by id: %w", errors.Join(ErrTransactionNotFound, err))
 		}
@@ -53,7 +91,7 @@ func (r *Repository) FindByID(id uuid.UUID) (*domain.Transaction, error) {
 
 func (r *Repository) FindAll() ([]*domain.Transaction, error) {
 	var transactions []*domain.Transaction
-	if err := r.db.Order("created_at DESC").Find(&transactions).Error; err != nil {
+	if err := r.db.Preload("FraudRules").Order("created_at DESC").Find(&transactions).Error; err != nil {
 		return nil, fmt.Errorf("find all transactions: %w", err)
 	}
 	return transactions, nil
@@ -61,23 +99,23 @@ func (r *Repository) FindAll() ([]*domain.Transaction, error) {
 
 func (r *Repository) FindByUserID(userID uuid.UUID) ([]*domain.Transaction, error) {
 	var transactions []*domain.Transaction
-	if err := r.db.Where("user_id = ?", userID).Find(&transactions).Error; err != nil {
+	if err := r.db.Preload("FraudRules").Where("user_id = ?", userID).Find(&transactions).Error; err != nil {
 		return nil, fmt.Errorf("find transactions by user id: %w", err)
 	}
 	return transactions, nil
 }
 
-func (r *Repository) GetTripleAmountSumLast24HoursByUserID(userID uuid.UUID) (int64, error) {
-	var tripleAmountSum int64
+func (r *Repository) GetTripleAmountAverageLast24HoursByUserID(userID uuid.UUID) (int64, error) {
+	var tripleAmountAverage int64
 
 	if err := r.db.Model(&domain.Transaction{}).
-		Select("COALESCE(SUM(amount), 0) * 3").
+		Select("COALESCE(AVG(amount), 0) * 3").
 		Where("user_id = ? AND created_at >= NOW() - INTERVAL '24 hours'", userID).
-		Scan(&tripleAmountSum).Error; err != nil {
-		return 0, fmt.Errorf("get triple amount sum last 24 hours by user id: %w", err)
+		Scan(&tripleAmountAverage).Error; err != nil {
+		return 0, fmt.Errorf("get triple amount average last 24 hours by user id: %w", err)
 	}
 
-	return tripleAmountSum, nil
+	return tripleAmountAverage, nil
 }
 
 func (r *Repository) Delete(id uuid.UUID) error {

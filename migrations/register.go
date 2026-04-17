@@ -6,5 +6,6 @@ func Register(migrator *database.Migrator) error {
 	return migrator.Register(
 		CreateUsersTable,
 		CreateTransactionsTable,
+		CreateTransactionFraudRulesTable,
 	)
 }
