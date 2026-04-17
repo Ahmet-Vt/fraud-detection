@@ -28,6 +28,14 @@ func (s *Service) CreateTransaction(transaction *domain.Transaction) error {
 	return nil
 }
 
+func (s *Service) UpdateFraudRules(transactionID uuid.UUID, rules []domain.TransactionFraudRule) error {
+	if err := s.repository.UpdateFraudRules(transactionID, rules); err != nil {
+		return fmt.Errorf("replace fraud rules: %w", err)
+	}
+
+	return nil
+}
+
 func (s *Service) GetTransactionByID(id uuid.UUID) (*domain.Transaction, error) {
 	transaction, err := s.repository.FindByID(id)
 	if err != nil {

@@ -12,7 +12,7 @@ import (
 
 type RepositoryInterface interface {
 	Create(transaction *domain.Transaction) error
-	ReplaceFraudRules(transactionID uuid.UUID, rules []domain.TransactionFraudRule) error
+	UpdateFraudRules(transactionID uuid.UUID, rules []domain.TransactionFraudRule) error
 	FindByID(id uuid.UUID) (*domain.Transaction, error)
 	FindAll() ([]*domain.Transaction, error)
 	FindByUserID(userID uuid.UUID) ([]*domain.Transaction, error)
@@ -41,7 +41,7 @@ func (r *Repository) Create(transaction *domain.Transaction) error {
 	return nil
 }
 
-func (r *Repository) ReplaceFraudRules(transactionID uuid.UUID, rules []domain.TransactionFraudRule) error {
+func (r *Repository) UpdateFraudRules(transactionID uuid.UUID, rules []domain.TransactionFraudRule) error {
 	return r.db.Transaction(func(tx *gorm.DB) error {
 		normalizedRules := make([]domain.TransactionFraudRule, 0, len(rules))
 		matchedRules := 0
@@ -55,12 +55,12 @@ func (r *Repository) ReplaceFraudRules(transactionID uuid.UUID, rules []domain.T
 		}
 
 		if err := tx.Where("transaction_id = ?", transactionID).Delete(&domain.TransactionFraudRule{}).Error; err != nil {
-			return fmt.Errorf("replace fraud rules: %w", err)
+			return fmt.Errorf("update fraud rules: %w", err)
 		}
 
 		if len(normalizedRules) > 0 {
 			if err := tx.Create(&normalizedRules).Error; err != nil {
-				return fmt.Errorf("replace fraud rules: %w", err)
+				return fmt.Errorf("update fraud rules: %w", err)
 			}
 		}
 
@@ -68,10 +68,10 @@ func (r *Repository) ReplaceFraudRules(transactionID uuid.UUID, rules []domain.T
 			Where("id = ?", transactionID).
 			Update("fraud_status", matchedRules >= 2)
 		if result.Error != nil {
-			return fmt.Errorf("replace fraud rules: %w", result.Error)
+			return fmt.Errorf("update fraud rules: %w", result.Error)
 		}
 		if result.RowsAffected == 0 {
-			return fmt.Errorf("replace fraud rules: %w", ErrTransactionNotFound)
+			return fmt.Errorf("update fraud rules: %w", ErrTransactionNotFound)
 		}
 
 		return nil
