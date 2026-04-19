@@ -1,7 +1,7 @@
 package migrations 
 
 import (
-	"github.com/Ahmet-Vt/fraud-detection/internal/database"
+	"fraud-detection/internal/database"
 
 	"gorm.io/gorm"
 )

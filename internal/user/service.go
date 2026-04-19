@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"github.com/Ahmet-Vt/fraud-detection/internal/domain"
+	"fraud-detection/internal/domain"
 	"github.com/google/uuid"
 )
 

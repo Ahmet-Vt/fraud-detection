@@ -5,8 +5,8 @@ import (
 	"log"
 	"net/http"
 
-	"github.com/Ahmet-Vt/fraud-detection/internal/domain"
-	"github.com/Ahmet-Vt/fraud-detection/internal/secureerr"
+	"fraud-detection/internal/domain"
+	"fraud-detection/internal/secureerr"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )

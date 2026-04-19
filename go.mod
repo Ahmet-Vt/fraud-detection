@@ -1,4 +1,4 @@
-module github.com/Ahmet-Vt/fraud-detection
+module fraud-detection
 
 go 1.26.1
 

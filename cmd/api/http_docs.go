@@ -3,7 +3,7 @@ package main
 import (
 	"net/http"
 
-	"github.com/Ahmet-Vt/fraud-detection/internal/messaging/rabbitmq"
+	"fraud-detection/internal/messaging/rabbitmq"
 	"github.com/gin-gonic/gin"
 	"gorm.io/gorm"
 )
