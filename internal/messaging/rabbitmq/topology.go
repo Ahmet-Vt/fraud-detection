@@ -4,6 +4,12 @@ import (
 	"fmt"
 )
 
+const (
+	FraudDetectionExchange = "fraud.detection"
+	FraudTransactionQueue  = "fraud.transaction.queue"
+	TransactionCreatedKey  = "transaction.created"
+)
+
 func (c *Client) DeclareTopology() error {
 	ch, err := c.conn.Channel()
 	if err != nil {
@@ -12,7 +18,7 @@ func (c *Client) DeclareTopology() error {
 	defer ch.Close()
 
 	if err := ch.ExchangeDeclare(
-		"fraud.detection",
+		FraudDetectionExchange,
 		"direct",
 		true,
 		false,
@@ -24,7 +30,7 @@ func (c *Client) DeclareTopology() error {
 	}
 
 	if _, err := ch.QueueDeclare(
-		"fraud.transaction.queue",
+		FraudTransactionQueue,
 		true,
 		false,
 		false,
@@ -35,17 +41,14 @@ func (c *Client) DeclareTopology() error {
 	}
 
 	if err := ch.QueueBind(
-		"fraud.transaction.queue",
-		"transaction.created",
-		"fraud.detection",
+		FraudTransactionQueue,
+		TransactionCreatedKey,
+		FraudDetectionExchange,
 		false,
 		nil,
 	); err != nil {
 		return fmt.Errorf("bind fraud detection queue: %w", err)
 	}
-
-
-	
 
 	return nil
 }
