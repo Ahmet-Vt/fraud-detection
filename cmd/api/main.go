@@ -1,6 +1,8 @@
 package main
 
 import (
+	"context"
+	"errors"
 	"log"
 
 	_ "fraud-detection/docs"
@@ -61,6 +63,17 @@ func main() {
 	transactionRepository := transaction.NewRepository(db)
 	transactionService := transaction.NewService(transactionRepository, publisher)
 	transactionHandler := transaction.NewHandler(transactionService)
+
+	fraudConsumer := rabbitmq.NewConsumer(rabbitMQClient, func(ctx context.Context, evt rabbitmq.TransactionCreatedMessage) error {
+		log.Printf("transaction.created id=%s user=%s amount=%d loc=%s",
+			evt.TransactionID, evt.UserID, evt.Amount, evt.Location)
+		return nil
+	})
+	go func() {
+		if err := fraudConsumer.Run(context.Background()); err != nil && !errors.Is(err, context.Canceled) {
+			log.Printf("rabbitmq consumer stopped: %v", err)
+		}
+	}()
 
 	router := gin.Default()
 
