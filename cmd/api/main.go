@@ -48,6 +48,10 @@ func main() {
 		}
 	}()
 
+	if err := rabbitMQClient.DeclareTopology(); err != nil {
+		log.Fatal("failed to declare rabbitmq topology: ", err)
+	}
+
 	userRepository := user.NewRepository(db)
 	userService := user.NewService(userRepository)
 	userHandler := user.NewHandler(userService)
