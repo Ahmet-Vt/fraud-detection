@@ -560,7 +560,7 @@
             "type": "object",
             "required": [
                 "amount",
-                "city",
+                "location",
                 "user_id"
             ],
             "properties": {
@@ -576,7 +576,7 @@
                     "x-order": "1",
                     "example": 5000
                 },
-                "city": {
+                "location": {
                     "type": "string",
                     "maxLength": 100,
                     "x-order": "2",
@@ -604,7 +604,7 @@
                     "x-order": "2",
                     "example": 5000
                 },
-                "city": {
+                "location": {
                     "type": "string",
                     "x-order": "3",
                     "example": "Istanbul"

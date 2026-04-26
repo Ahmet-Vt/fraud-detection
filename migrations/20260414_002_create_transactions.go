@@ -27,7 +27,7 @@ var CreateTransactionsTable = database.MigrationEntry{
 				id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
 				user_id UUID NOT NULL,
 				amount BIGINT NOT NULL,
-				city VARCHAR(100) NOT NULL,
+				location VARCHAR(100) NOT NULL,
 				amount_rule_matched BOOLEAN NOT NULL DEFAULT FALSE,
 				location_rule_matched BOOLEAN NOT NULL DEFAULT FALSE,
 				velocity_rule_matched BOOLEAN NOT NULL DEFAULT FALSE,

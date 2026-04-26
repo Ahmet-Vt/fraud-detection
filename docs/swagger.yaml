@@ -138,7 +138,7 @@ definitions:
         minimum: 1
         type: integer
         x-order: "1"
-      city:
+      location:
         example: Istanbul
         maxLength: 100
         type: string
@@ -150,7 +150,7 @@ definitions:
         x-order: "0"
     required:
     - amount
-    - city
+    - location
     - user_id
     type: object
   transaction.TransactionResponse:
@@ -159,7 +159,7 @@ definitions:
         example: 5000
         type: integer
         x-order: "2"
-      city:
+      location:
         example: Istanbul
         type: string
         x-order: "3"

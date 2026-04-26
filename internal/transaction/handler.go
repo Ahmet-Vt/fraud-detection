@@ -16,18 +16,18 @@ type Handler struct {
 }
 
 type createTransactionRequest struct {
-	UserID uuid.UUID `json:"user_id" binding:"required" format:"uuid" example:"4ca5e74c-3a07-4010-9f07-14e90a35868b" extensions:"x-order=0"`
-	Amount int64     `json:"amount" binding:"required,min=1" example:"5000" extensions:"x-order=1"`
-	City   string    `json:"city" binding:"required,max=100" example:"Istanbul" extensions:"x-order=2"`
+	UserID   uuid.UUID `json:"user_id" binding:"required" format:"uuid" example:"4ca5e74c-3a07-4010-9f07-14e90a35868b" extensions:"x-order=0"`
+	Amount   int64     `json:"amount" binding:"required,min=1" example:"5000" extensions:"x-order=1"`
+	Location string    `json:"location" binding:"required,max=100" example:"Istanbul" extensions:"x-order=2"`
 }
 
 type CreateTransactionRequest = createTransactionRequest
 
 type transactionResponse struct {
-	ID     uuid.UUID `json:"id" format:"uuid" example:"1dc90ef0-76a0-4cb2-891e-5193c60aa82f" extensions:"x-order=0"`
-	UserID uuid.UUID `json:"user_id" format:"uuid" example:"4ca5e74c-3a07-4010-9f07-14e90a35868b" extensions:"x-order=1"`
-	Amount int64     `json:"amount" example:"5000" extensions:"x-order=2"`
-	City   string    `json:"city" example:"Istanbul" extensions:"x-order=3"`
+	ID       uuid.UUID `json:"id" format:"uuid" example:"1dc90ef0-76a0-4cb2-891e-5193c60aa82f" extensions:"x-order=0"`
+	UserID   uuid.UUID `json:"user_id" format:"uuid" example:"4ca5e74c-3a07-4010-9f07-14e90a35868b" extensions:"x-order=1"`
+	Amount   int64     `json:"amount" example:"5000" extensions:"x-order=2"`
+	Location string    `json:"location" example:"Istanbul" extensions:"x-order=3"`
 }
 
 type TransactionResponse = transactionResponse
@@ -69,9 +69,9 @@ func (h *Handler) CreateTransaction(c *gin.Context) {
 	}
 
 	transaction := &domain.Transaction{
-		UserID: req.UserID,
-		Amount: req.Amount,
-		City:   req.City,
+		UserID:   req.UserID,
+		Amount:   req.Amount,
+		Location: req.Location,
 	}
 
 	if err := h.service.CreateTransaction(transaction); err != nil {
@@ -223,10 +223,10 @@ func (h *Handler) writeError(c *gin.Context, err error) {
 
 func toTransactionResponse(transaction *domain.Transaction) transactionResponse {
 	return transactionResponse{
-		ID:     transaction.ID,
-		UserID: transaction.UserID,
-		Amount: transaction.Amount,
-		City:   transaction.City,
+		ID:       transaction.ID,
+		UserID:   transaction.UserID,
+		Amount:   transaction.Amount,
+		Location: transaction.Location,
 	}
 }
 

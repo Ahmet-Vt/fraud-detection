@@ -43,7 +43,7 @@ type Transaction struct {
 	UserID            uuid.UUID              `json:"user_id" gorm:"type:uuid;not null;index"`
 	User              User                   `json:"user" gorm:"constraint:OnUpdate:CASCADE,OnDelete:CASCADE;"`
 	Amount            int64                  `json:"amount" gorm:"type:bigint;not null"`
-	City              string                 `json:"city" gorm:"type:varchar(100);not null"`
+	Location          string                 `json:"location" gorm:"type:varchar(100);not null"`
 	FraudRules        []TransactionFraudRule `json:"fraud_rules,omitempty" gorm:"foreignKey:TransactionID"`
 	TransactionStatus Status                 `json:"transaction_status" gorm:"type:status;not null;default:pending"`
 	FraudStatus       bool                   `json:"fraud_status" gorm:"not null;default:false;index"`

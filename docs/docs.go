@@ -563,7 +563,7 @@ const docTemplate = `{
             "type": "object",
             "required": [
                 "amount",
-                "city",
+                "location",
                 "user_id"
             ],
             "properties": {
@@ -579,7 +579,7 @@ const docTemplate = `{
                     "x-order": "1",
                     "example": 5000
                 },
-                "city": {
+                "location": {
                     "type": "string",
                     "maxLength": 100,
                     "x-order": "2",
@@ -607,7 +607,7 @@ const docTemplate = `{
                     "x-order": "2",
                     "example": 5000
                 },
-                "city": {
+                "location": {
                     "type": "string",
                     "x-order": "3",
                     "example": "Istanbul"
