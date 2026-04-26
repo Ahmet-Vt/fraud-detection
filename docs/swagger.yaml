@@ -7,7 +7,7 @@ definitions:
         type: string
         x-order: "0"
       error:
-        example: an unexpected error occurred
+        example: Internal Server Error
         type: string
         x-order: "1"
     type: object

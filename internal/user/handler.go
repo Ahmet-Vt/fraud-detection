@@ -135,7 +135,7 @@ func (h *Handler) GetAllUsers(c *gin.Context) {
 	c.JSON(http.StatusOK, toUserResponses(users))
 }
 
-func (h *Handler) mapError(err error) *secureerr.Error {
+func (h *Handler) mapError(err error) error {
 	if errors.Is(err, ErrUserNotFound) {
 		return secureerr.NotFound("USER_NOT_FOUND", "user not found", err, nil)
 	}
@@ -145,10 +145,15 @@ func (h *Handler) mapError(err error) *secureerr.Error {
 	if errors.Is(err, ErrInvalidUserID) {
 		return secureerr.BadRequest("INVALID_USER_ID", "invalid user id", err, nil)
 	}
-	return secureerr.Internal("INTERNAL_ERROR", "an unexpected error occurred", err, nil)
+	return secureerr.FromError(err)
 }
 
-func (h *Handler) writeError(c *gin.Context, appErr *secureerr.Error) {
+func (h *Handler) writeError(c *gin.Context, err error) {
+	appErr := secureerr.FromError(err)
+	if appErr == nil {
+		return
+	}
+
 	log.Printf("user handler error: %s", appErr.LogString())
 
 	c.JSON(appErr.StatusCode(), gin.H{

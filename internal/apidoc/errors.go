@@ -42,5 +42,5 @@ type ReferencedUserNotExistsError struct {
 
 type InternalServerError struct {
 	Code  string `json:"code" example:"INTERNAL_ERROR" extensions:"x-order=0"`
-	Error string `json:"error" example:"an unexpected error occurred" extensions:"x-order=1"`
+	Error string `json:"error" example:"Internal Server Error" extensions:"x-order=1"`
 }

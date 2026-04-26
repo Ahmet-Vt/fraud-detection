@@ -392,7 +392,7 @@ const docTemplate = `{
                 "error": {
                     "type": "string",
                     "x-order": "1",
-                    "example": "an unexpected error occurred"
+                    "example": "Internal Server Error"
                 }
             }
         },

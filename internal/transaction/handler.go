@@ -194,7 +194,7 @@ func (h *Handler) DeleteTransaction(c *gin.Context) {
 	c.Status(http.StatusNoContent)
 }
 
-func (h *Handler) mapError(err error) *secureerr.Error {
+func (h *Handler) mapError(err error) error {
 	if errors.Is(err, ErrTransactionNotFound) {
 		return secureerr.NotFound("TRANSACTION_NOT_FOUND", "transaction not found", err, nil)
 	}
@@ -204,10 +204,15 @@ func (h *Handler) mapError(err error) *secureerr.Error {
 	if errors.Is(err, ErrUserNotExists) {
 		return secureerr.BadRequest("USER_NOT_EXISTS", "referenced user does not exist", err, nil)
 	}
-	return secureerr.Internal("INTERNAL_ERROR", "an unexpected error occurred", err, nil)
+	return secureerr.FromError(err)
 }
 
-func (h *Handler) writeError(c *gin.Context, appErr *secureerr.Error) {
+func (h *Handler) writeError(c *gin.Context, err error) {
+	appErr := secureerr.FromError(err)
+	if appErr == nil {
+		return
+	}
+
 	log.Printf("transaction handler error: %s", appErr.LogString())
 
 	c.JSON(appErr.StatusCode(), gin.H{
