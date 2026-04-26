@@ -52,12 +52,14 @@ func main() {
 		log.Fatal("failed to declare rabbitmq topology: ", err)
 	}
 
+	publisher := rabbitmq.NewPublisher(rabbitMQClient)
+
 	userRepository := user.NewRepository(db)
 	userService := user.NewService(userRepository)
 	userHandler := user.NewHandler(userService)
 
 	transactionRepository := transaction.NewRepository(db)
-	transactionService := transaction.NewService(transactionRepository)
+	transactionService := transaction.NewService(transactionRepository, publisher)
 	transactionHandler := transaction.NewHandler(transactionService)
 
 	router := gin.Default()

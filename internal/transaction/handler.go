@@ -74,7 +74,7 @@ func (h *Handler) CreateTransaction(c *gin.Context) {
 		Location: req.Location,
 	}
 
-	if err := h.service.CreateTransaction(transaction); err != nil {
+	if err := h.service.CreateTransaction(c.Request.Context(), transaction); err != nil {
 		h.writeError(c, h.mapError(err))
 		return
 	}

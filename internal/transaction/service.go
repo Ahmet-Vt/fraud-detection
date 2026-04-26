@@ -1,28 +1,41 @@
 package transaction
 
 import (
+	"context"
 	"errors"
 	"fmt"
+	"log"
 
 	"fraud-detection/internal/domain"
 	"github.com/google/uuid"
 )
 
+type transactionCreatedPublisher interface {
+	PublishTransactionCreated(ctx context.Context, transaction *domain.Transaction) error
+}
+
 type Service struct {
 	repository RepositoryInterface
+	publisher  transactionCreatedPublisher
 }
 
-func NewService(repository RepositoryInterface) *Service {
-	return &Service{repository: repository}
+func NewService(repository RepositoryInterface, publisher transactionCreatedPublisher) *Service {
+	return &Service{repository: repository, publisher: publisher}
 }
 
-func (s *Service) CreateTransaction(transaction *domain.Transaction) error {
+func (s *Service) CreateTransaction(ctx context.Context, transaction *domain.Transaction) error {
 	if transaction == nil {
 		return fmt.Errorf("create transaction: %w", errors.New("nil transaction"))
 	}
 
 	if err := s.repository.Create(transaction); err != nil {
 		return fmt.Errorf("create transaction: %w", err)
+	}
+
+	if s.publisher != nil {
+		if err := s.publisher.PublishTransactionCreated(ctx, transaction); err != nil {
+			log.Printf("publish transaction created event: %v", err)
+		}
 	}
 
 	return nil
