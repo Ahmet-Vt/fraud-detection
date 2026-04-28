@@ -3,7 +3,6 @@ package transaction
 import (
 	"errors"
 	"fmt"
-
 	"fraud-detection/internal/domain"
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"

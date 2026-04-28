@@ -11,7 +11,7 @@ import (
 )
 
 type transactionCreatedPublisher interface {
-	PublishTransactionCreated(ctx context.Context, transaction *domain.Transaction) error
+	PublishTransactionCreated(ctx context.Context, evt TransactionCreatedEvent) error
 }
 
 type Service struct {
@@ -33,7 +33,14 @@ func (s *Service) CreateTransaction(ctx context.Context, transaction *domain.Tra
 	}
 
 	if s.publisher != nil {
-		if err := s.publisher.PublishTransactionCreated(ctx, transaction); err != nil {
+		evt := TransactionCreatedEvent{
+			TransactionID: transaction.ID.String(),
+			UserID:        transaction.UserID.String(),
+			Amount:        transaction.Amount,
+			Location:      transaction.Location,
+			CreatedAt:     transaction.CreatedAt,
+		}
+		if err := s.publisher.PublishTransactionCreated(ctx, evt); err != nil {
 			log.Printf("publish transaction created event: %v", err)
 		}
 	}

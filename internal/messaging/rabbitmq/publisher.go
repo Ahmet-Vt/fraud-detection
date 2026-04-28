@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"fraud-detection/internal/domain"
+	"fraud-detection/internal/transaction"
 	amqp "github.com/rabbitmq/amqp091-go"
 )
 
@@ -26,12 +26,9 @@ type TransactionCreatedMessage struct {
 	CreatedAt     time.Time `json:"created_at"`
 }
 
-func (p *Publisher) PublishTransactionCreated(ctx context.Context, transaction *domain.Transaction) error {
+func (p *Publisher) PublishTransactionCreated(ctx context.Context, evt transaction.TransactionCreatedEvent) error {
 	if p == nil || p.client == nil {
 		return fmt.Errorf("publisher is nil")
-	}
-	if transaction == nil {
-		return fmt.Errorf("transaction is nil")
 	}
 
 	ch, err := p.client.OpenChannel()
@@ -41,11 +38,11 @@ func (p *Publisher) PublishTransactionCreated(ctx context.Context, transaction *
 	defer ch.Close()
 
 	message := TransactionCreatedMessage{
-		TransactionID: transaction.ID.String(),
-		UserID:        transaction.UserID.String(),
-		Amount:        transaction.Amount,
-		Location:      transaction.Location,
-		CreatedAt:     transaction.CreatedAt,
+		TransactionID: evt.TransactionID,
+		UserID:        evt.UserID,
+		Amount:        evt.Amount,
+		Location:      evt.Location,
+		CreatedAt:     evt.CreatedAt,
 	}
 
 	body, err := json.Marshal(message)

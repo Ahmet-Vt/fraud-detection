@@ -12,6 +12,7 @@ import (
 	"fraud-detection/internal/transaction"
 	"fraud-detection/internal/user"
 	"fraud-detection/migrations"
+
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
