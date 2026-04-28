@@ -83,6 +83,15 @@ func (s *Service) GetTransactionsByUserID(userID uuid.UUID) ([]*domain.Transacti
 	return transactions, nil
 }
 
+func (s *Service) GetTripleAmountAverageLast24HoursByUserID(userID uuid.UUID) (int64, error) {
+	tripleAverage, err := s.repository.GetTripleAmountAverageLast24HoursByUserID(userID)
+	if err != nil {
+		return 0, fmt.Errorf("get triple amount average last 24 hours by user id: %w", err)
+	}
+
+	return tripleAverage, nil
+}
+
 func (s *Service) DeleteTransaction(id uuid.UUID) error {
 	if err := s.repository.Delete(id); err != nil {
 		return fmt.Errorf("delete transaction: %w", err)
