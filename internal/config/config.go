@@ -26,6 +26,15 @@ type RabbitMQConfig struct {
 	Password string
 }
 
+type RedisConfig struct {
+	Host string
+	Port string
+}
+
+func (c RedisConfig) Addr() string {
+	return net.JoinHostPort(c.Host, c.Port)
+}
+
 func (c RabbitMQConfig) AMQPURL() string {
 	return (&url.URL{
 		Scheme: "amqp",
@@ -50,6 +59,7 @@ func (c DBConfig) DSN() string {
 type AppConfig struct {
 	DB       DBConfig
 	RabbitMQ RabbitMQConfig
+	Redis    RedisConfig
 }
 
 func Load() AppConfig {
@@ -78,6 +88,10 @@ func loadConfig() AppConfig {
 			Port:     requireEnv("RABBITMQ_PORT"),
 			User:     requireEnv("RABBITMQ_USER"),
 			Password: requireEnv("RABBITMQ_PASSWORD"),
+		},
+		Redis: RedisConfig{
+			Host: requireEnv("REDIS_HOST"),
+			Port: requireEnv("REDIS_PORT"),
 		},
 	}
 }

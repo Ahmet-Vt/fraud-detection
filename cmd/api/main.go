@@ -4,13 +4,16 @@ import (
 	"context"
 	"errors"
 	"log"
+	"time"
 
 	_ "fraud-detection/docs"
+	"fraud-detection/internal/cache"
 	"fraud-detection/internal/config"
 	"fraud-detection/internal/database"
 	"fraud-detection/internal/messaging/rabbitmq"
 	"fraud-detection/internal/transaction"
 	"fraud-detection/internal/user"
+	"fraud-detection/internal/worker"
 	"fraud-detection/migrations"
 
 	"github.com/gin-gonic/gin"
@@ -41,6 +44,16 @@ func main() {
 		log.Fatal("migrations failed: ", err)
 	}
 
+	redisClient, err := cache.NewRedis(context.Background(), cfg.Redis.Addr())
+	if err != nil {
+		log.Fatal("failed to connect redis: ", err)
+	}
+	defer func() {
+		if err := redisClient.Close(); err != nil {
+			log.Printf("failed to close redis client: %v", err)
+		}
+	}()
+
 	rabbitMQClient, err := rabbitmq.New(cfg.RabbitMQ.AMQPURL())
 	if err != nil {
 		log.Fatal("failed to connect rabbitmq: ", err)
@@ -64,11 +77,10 @@ func main() {
 	transactionRepository := transaction.NewRepository(db)
 	transactionService := transaction.NewService(transactionRepository, publisher)
 	transactionHandler := transaction.NewHandler(transactionService)
+	workerPool := worker.NewPool(transactionService, 2*time.Second)
 
 	fraudConsumer := rabbitmq.NewConsumer(rabbitMQClient, func(ctx context.Context, evt rabbitmq.TransactionCreatedMessage) error {
-		log.Printf("transaction.created id=%s user=%s amount=%d loc=%s",
-			evt.TransactionID, evt.UserID, evt.Amount, evt.Location)
-		return nil
+		return workerPool.HandleTransactionCreated(ctx, evt)
 	})
 	go func() {
 		if err := fraudConsumer.Run(context.Background()); err != nil && !errors.Is(err, context.Canceled) {
@@ -78,7 +90,7 @@ func main() {
 
 	router := gin.Default()
 
-	router.GET("/health", healthHandler(db, rabbitMQClient))
+	router.GET("/health", healthHandler(db, redisClient, rabbitMQClient))
 
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 

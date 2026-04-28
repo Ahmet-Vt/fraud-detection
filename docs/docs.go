@@ -17,7 +17,7 @@ const docTemplate = `{
     "paths": {
         "/health": {
             "get": {
-                "description": "Checks PostgreSQL and RabbitMQ connectivity.",
+                "description": "Checks PostgreSQL, Redis, and RabbitMQ connectivity.",
                 "produces": [
                     "application/json"
                 ],
@@ -537,9 +537,14 @@ const docTemplate = `{
                     "x-order": "0",
                     "example": "down"
                 },
-                "rabbitmq": {
+                "redis": {
                     "type": "string",
                     "x-order": "1",
+                    "example": "down"
+                },
+                "rabbitmq": {
+                    "type": "string",
+                    "x-order": "2",
                     "example": "down"
                 }
             }
@@ -552,9 +557,14 @@ const docTemplate = `{
                     "x-order": "0",
                     "example": "up"
                 },
-                "rabbitmq": {
+                "redis": {
                     "type": "string",
                     "x-order": "1",
+                    "example": "up"
+                },
+                "rabbitmq": {
+                    "type": "string",
+                    "x-order": "2",
                     "example": "up"
                 }
             }

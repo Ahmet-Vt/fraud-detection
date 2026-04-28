@@ -118,6 +118,10 @@ definitions:
       rabbitmq:
         example: down
         type: string
+        x-order: "2"
+      redis:
+        example: down
+        type: string
         x-order: "1"
     type: object
   main.healthUpResponse:
@@ -127,6 +131,10 @@ definitions:
         type: string
         x-order: "0"
       rabbitmq:
+        example: up
+        type: string
+        x-order: "2"
+      redis:
         example: up
         type: string
         x-order: "1"
@@ -159,15 +167,15 @@ definitions:
         example: 5000
         type: integer
         x-order: "2"
-      location:
-        example: Istanbul
-        type: string
-        x-order: "3"
       id:
         example: 1dc90ef0-76a0-4cb2-891e-5193c60aa82f
         format: uuid
         type: string
         x-order: "0"
+      location:
+        example: Istanbul
+        type: string
+        x-order: "3"
       user_id:
         example: 4ca5e74c-3a07-4010-9f07-14e90a35868b
         format: uuid
@@ -246,7 +254,7 @@ info:
 paths:
   /health:
     get:
-      description: Checks PostgreSQL and RabbitMQ connectivity.
+      description: Checks PostgreSQL, Redis, and RabbitMQ connectivity.
       produces:
       - application/json
       responses:
