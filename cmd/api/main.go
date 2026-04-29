@@ -44,7 +44,11 @@ func main() {
 		log.Fatal("migrations failed: ", err)
 	}
 
-	redisClient, err := cache.NewRedis(context.Background(), cfg.Redis.Addr())
+	redisClient, err := cache.NewRedis(
+		context.Background(),
+		cfg.Redis.Addr(),
+	)
+
 	if err != nil {
 		log.Fatal("failed to connect redis: ", err)
 	}
@@ -75,7 +79,7 @@ func main() {
 	userHandler := user.NewHandler(userService)
 
 	transactionRepository := transaction.NewRepository(db)
-	transactionService := transaction.NewService(transactionRepository, publisher)
+	transactionService := transaction.NewService(transactionRepository, publisher, redisClient)
 	transactionHandler := transaction.NewHandler(transactionService)
 	workerPool := worker.NewPool(transactionService, 2*time.Second)
 

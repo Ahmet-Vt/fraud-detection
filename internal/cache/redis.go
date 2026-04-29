@@ -9,7 +9,10 @@ import (
 
 func NewRedis(ctx context.Context, addr string) (*redis.Client, error) {
 	client := redis.NewClient(&redis.Options{
-		Addr: addr,
+		Addr:     addr,
+		Password: "",
+		DB:       0,
+		Protocol: 2,
 	})
 
 	if err := client.Ping(ctx).Err(); err != nil {
