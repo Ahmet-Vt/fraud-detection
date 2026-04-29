@@ -128,7 +128,21 @@ func (r *Repository) Delete(id uuid.UUID) error {
 	return nil
 }
 
+func (r *Repository) GetLastLocationByUserTransactionID(userID uuid.UUID, _ uuid.UUID) (string, error) {
+	var transaction domain.Transaction
+	if err := r.db.Model(&domain.Transaction{}).
+		Select("location").
+		Where("user_id = ?", userID).
+		Order("created_at DESC").
+		Take(&transaction).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return "", nil
+		}
+		return "", fmt.Errorf("get last location by user transaction id: %w", err)
+	}
 
+	return transaction.Location, nil
+}
 
 func isUniqueViolation(err error) bool {
 	var pgErr *pgconn.PgError

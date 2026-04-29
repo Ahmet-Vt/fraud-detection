@@ -8,6 +8,7 @@ import (
 
 	"fraud-detection/internal/domain"
 	"github.com/google/uuid"
+	"github.com/redis/go-redis/v9"
 )
 
 type transactionCreatedPublisher interface {
@@ -17,10 +18,15 @@ type transactionCreatedPublisher interface {
 type Service struct {
 	repository RepositoryInterface
 	publisher  transactionCreatedPublisher
+	cache      redis.Cmdable
 }
 
-func NewService(repository RepositoryInterface, publisher transactionCreatedPublisher) *Service {
-	return &Service{repository: repository, publisher: publisher}
+func NewService(repository RepositoryInterface, publisher transactionCreatedPublisher, cache redis.Cmdable) *Service {
+	return &Service{
+		repository: repository,
+		publisher:  publisher,
+		cache:      cache,
+	}
 }
 
 func (s *Service) CreateTransaction(ctx context.Context, transaction *domain.Transaction) error {
