@@ -44,70 +44,9 @@ var CreateTransactionFraudRulesTable = database.MigrationEntry{
 			return err
 		}
 
-		if err := tx.Exec(`
-			INSERT INTO transaction_fraud_rules (transaction_id, rule_name, matched)
-			SELECT id, 'amount'::fraud_rule_name, amount_rule_matched FROM transactions
-			UNION ALL
-			SELECT id, 'location'::fraud_rule_name, location_rule_matched FROM transactions
-			UNION ALL
-			SELECT id, 'velocity'::fraud_rule_name, velocity_rule_matched FROM transactions
-		`).Error; err != nil {
-			return err
-		}
-
-		if err := tx.Exec(`ALTER TABLE transactions DROP COLUMN amount_rule_matched`).Error; err != nil {
-			return err
-		}
-		if err := tx.Exec(`ALTER TABLE transactions DROP COLUMN location_rule_matched`).Error; err != nil {
-			return err
-		}
-
-		return tx.Exec(`ALTER TABLE transactions DROP COLUMN velocity_rule_matched`).Error
+		return nil
 	},
 	Down: func(tx *gorm.DB) error {
-		if err := tx.Exec(`ALTER TABLE transactions ADD COLUMN amount_rule_matched BOOLEAN NOT NULL DEFAULT FALSE`).Error; err != nil {
-			return err
-		}
-		if err := tx.Exec(`ALTER TABLE transactions ADD COLUMN location_rule_matched BOOLEAN NOT NULL DEFAULT FALSE`).Error; err != nil {
-			return err
-		}
-		if err := tx.Exec(`ALTER TABLE transactions ADD COLUMN velocity_rule_matched BOOLEAN NOT NULL DEFAULT FALSE`).Error; err != nil {
-			return err
-		}
-
-		if err := tx.Exec(`
-			UPDATE transactions
-			SET amount_rule_matched = COALESCE((
-				SELECT matched
-				FROM transaction_fraud_rules
-				WHERE transaction_id = transactions.id AND rule_name = 'amount'
-			), FALSE)
-		`).Error; err != nil {
-			return err
-		}
-
-		if err := tx.Exec(`
-			UPDATE transactions
-			SET location_rule_matched = COALESCE((
-				SELECT matched
-				FROM transaction_fraud_rules
-				WHERE transaction_id = transactions.id AND rule_name = 'location'
-			), FALSE)
-		`).Error; err != nil {
-			return err
-		}
-
-		if err := tx.Exec(`
-			UPDATE transactions
-			SET velocity_rule_matched = COALESCE((
-				SELECT matched
-				FROM transaction_fraud_rules
-				WHERE transaction_id = transactions.id AND rule_name = 'velocity'
-			), FALSE)
-		`).Error; err != nil {
-			return err
-		}
-
 		if err := tx.Exec(`DROP TABLE IF EXISTS transaction_fraud_rules`).Error; err != nil {
 			return err
 		}
