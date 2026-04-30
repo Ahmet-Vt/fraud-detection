@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log"
 	"time"
 
@@ -10,6 +11,7 @@ import (
 	"fraud-detection/internal/cache"
 	"fraud-detection/internal/config"
 	"fraud-detection/internal/database"
+	"fraud-detection/internal/fraud"
 	"fraud-detection/internal/messaging/rabbitmq"
 	"fraud-detection/internal/transaction"
 	"fraud-detection/internal/user"
@@ -34,6 +36,14 @@ func main() {
 	if err != nil {
 		log.Fatal("failed to connect database: ", err)
 	}
+	sqlDB, err := db.DB()
+	if err != nil {
+		log.Fatal("failed to get database sql instance: ", err)
+	}
+	sqlDB.SetMaxOpenConns(cfg.DB.MaxOpenConns)
+	sqlDB.SetMaxIdleConns(cfg.DB.MaxIdleConns)
+	sqlDB.SetConnMaxLifetime(time.Duration(cfg.DB.ConnMaxLifetime) * time.Minute)
+	sqlDB.SetConnMaxIdleTime(time.Duration(cfg.DB.ConnMaxIdleTime) * time.Minute)
 
 	migrator := database.NewMigrator(db)
 	if err := migrations.Register(migrator); err != nil {
@@ -73,24 +83,40 @@ func main() {
 	}
 
 	publisher := rabbitmq.NewPublisher(rabbitMQClient)
+	defer func() {
+		if err := publisher.Close(); err != nil {
+			log.Printf("failed to close rabbitmq publisher: %v", err)
+		}
+	}()
 
 	userRepository := user.NewRepository(db)
 	userService := user.NewService(userRepository)
 	userHandler := user.NewHandler(userService)
 
 	transactionRepository := transaction.NewRepository(db)
-	transactionService := transaction.NewService(transactionRepository, publisher, redisClient)
+	transactionStateCache := cache.NewTransactionStateCache(redisClient)
+	transactionService := transaction.NewService(transactionRepository, publisher, transactionStateCache)
 	transactionHandler := transaction.NewHandler(transactionService)
-	workerPool := worker.NewPool(transactionService, 2*time.Second)
+	fraudService := fraud.NewService(transactionService, transactionStateCache)
+	workerPool := worker.NewPool(fraudService)
 
-	fraudConsumer := rabbitmq.NewConsumer(rabbitMQClient, func(ctx context.Context, evt rabbitmq.TransactionCreatedMessage) error {
-		return workerPool.HandleTransactionCreated(ctx, evt)
-	})
-	go func() {
-		if err := fraudConsumer.Run(context.Background()); err != nil && !errors.Is(err, context.Canceled) {
-			log.Printf("rabbitmq consumer stopped: %v", err)
-		}
-	}()
+	for i := 1; i <= cfg.RabbitMQ.ConsumerCount; i++ {
+		tag := fmt.Sprintf("fraud-worker-%d", i)
+		fraudConsumer := rabbitmq.NewConsumer(
+			rabbitMQClient,
+			func(ctx context.Context, evt rabbitmq.TransactionCreatedMessage) error {
+				return workerPool.HandleTransactionCreated(ctx, evt)
+			},
+			tag,
+			cfg.RabbitMQ.PrefetchCount,
+		)
+
+		go func(consumerTag string, consumer *rabbitmq.Consumer) {
+			if err := consumer.Run(context.Background()); err != nil && !errors.Is(err, context.Canceled) {
+				log.Printf("rabbitmq consumer stopped tag=%s: %v", consumerTag, err)
+			}
+		}(tag, fraudConsumer)
+	}
 
 	router := gin.Default()
 
