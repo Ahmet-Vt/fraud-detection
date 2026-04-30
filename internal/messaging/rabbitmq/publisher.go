@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"sync"
 	"time"
 
 	"fraud-detection/internal/transaction"
@@ -12,6 +13,8 @@ import (
 
 type Publisher struct {
 	client *Client
+	mu     sync.Mutex
+	ch     *amqp.Channel
 }
 
 func NewPublisher(client *Client) *Publisher {
@@ -31,11 +34,13 @@ func (p *Publisher) PublishTransactionCreated(ctx context.Context, evt transacti
 		return fmt.Errorf("publisher is nil")
 	}
 
-	ch, err := p.client.OpenChannel()
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	ch, err := p.ensureChannel()
 	if err != nil {
-		return fmt.Errorf("open rabbitmq channel: %w", err)
+		return err
 	}
-	defer ch.Close()
 
 	message := TransactionCreatedMessage{
 		TransactionID: evt.TransactionID,
@@ -67,4 +72,35 @@ func (p *Publisher) PublishTransactionCreated(ctx context.Context, evt transacti
 	}
 
 	return nil
+}
+
+func (p *Publisher) ensureChannel() (*amqp.Channel, error) {
+	if p.ch != nil && !p.ch.IsClosed() {
+		return p.ch, nil
+	}
+
+	ch, err := p.client.OpenChannel()
+	if err != nil {
+		return nil, fmt.Errorf("open rabbitmq channel: %w", err)
+	}
+	p.ch = ch
+
+	return p.ch, nil
+}
+
+func (p *Publisher) Close() error {
+	if p == nil {
+		return nil
+	}
+
+	p.mu.Lock()
+	defer p.mu.Unlock()
+
+	if p.ch == nil {
+		return nil
+	}
+
+	err := p.ch.Close()
+	p.ch = nil
+	return err
 }
