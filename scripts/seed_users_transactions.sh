@@ -5,11 +5,12 @@ usage() {
 	cat <<'EOF'
 Usage: seed_users_transactions.sh [options]
 
-Creates users named user1, user2, ... and POSTs transactions per user.
+Creates load by posting transactions for a fixed duration and rate.
 
 Options:
-  -u, --users N                 Number of users to create (default: 3)
-  -t, --transactions-per-user M  Transactions per user (default: 2)
+  -d, --duration S              Script runtime in seconds (default: 30)
+  -r, --rate RPS                Target requests per second (default: 100)
+  -c, --concurrency K           Parallel channels (default: 4)
       --base-url URL            API base URL (default: env BASE_URL or http://localhost:8080)
 
 Environment:
@@ -18,14 +19,16 @@ Environment:
 Requires: curl, jq
 
 Example:
-  ./scripts/seed_users_transactions.sh -u 5 -t 10
-  BASE_URL=http://127.0.0.1:8080 ./scripts/seed_users_transactions.sh --users 2 --transactions-per-user 1
+  ./scripts/seed_users_transactions.sh --duration 60 --rate 200 --concurrency 8
+  BASE_URL=http://127.0.0.1:8080 ./scripts/seed_users_transactions.sh -d 30 -r 100 -c 4
 EOF
 }
 
 BASE_URL="${BASE_URL:-http://localhost:8080}"
-USERS=3
-TX_PER_USER=2
+DURATION=30
+RATE=100
+CONCURRENCY=4
+USER_ROTATE_SECONDS=10
 
 while [[ $# -gt 0 ]]; do
 	case "$1" in
@@ -33,12 +36,16 @@ while [[ $# -gt 0 ]]; do
 		usage
 		exit 0
 		;;
-	-u | --users)
-		USERS="${2:?missing value for $1}"
+	-d | --duration)
+		DURATION="${2:?missing value for $1}"
 		shift 2
 		;;
-	-t | --transactions-per-user)
-		TX_PER_USER="${2:?missing value for $1}"
+	-r | --rate)
+		RATE="${2:?missing value for $1}"
+		shift 2
+		;;
+	-c | --concurrency)
+		CONCURRENCY="${2:?missing value for $1}"
 		shift 2
 		;;
 	--base-url)
@@ -53,12 +60,16 @@ while [[ $# -gt 0 ]]; do
 	esac
 done
 
-if ! [[ "$USERS" =~ ^[1-9][0-9]*$ ]]; then
-	echo "users must be a positive integer, got: $USERS" >&2
+if ! [[ "$DURATION" =~ ^[1-9][0-9]*$ ]]; then
+	echo "duration must be a positive integer, got: $DURATION" >&2
 	exit 1
 fi
-if ! [[ "$TX_PER_USER" =~ ^[0-9]+$ ]] || [[ "$TX_PER_USER" -lt 0 ]]; then
-	echo "transactions-per-user must be a non-negative integer, got: $TX_PER_USER" >&2
+if ! [[ "$RATE" =~ ^[1-9][0-9]*$ ]]; then
+	echo "rate must be a positive integer, got: $RATE" >&2
+	exit 1
+fi
+if ! [[ "$CONCURRENCY" =~ ^[1-9][0-9]*$ ]]; then
+	echo "concurrency must be a positive integer, got: $CONCURRENCY" >&2
 	exit 1
 fi
 
@@ -73,17 +84,13 @@ command -v jq >/dev/null 2>&1 || {
 
 LOCATIONS=(Istanbul Ankara Izmir Bursa)
 
-resp_body="$(mktemp)"
-trap 'rm -f "$resp_body"' EXIT
-
 create_user() {
 	local idx="$1"
 	local name="user${idx}"
+	local resp_body=""
+	resp_body="$(mktemp)"
 	local body
-	body=$(jq -n \
-		--arg name "$name" \
-		--arg email "user${idx}@seed.local" \
-		'{name: $name, surname: "User", email: $email, status: "active"}')
+	body=$(printf '{"name":"%s","surname":"User","email":"%s","status":"active"}' "$name" "user${idx}@seed.local")
 
 	local http_code
 	http_code=$(curl -sS -o "$resp_body" -w '%{http_code}' -X POST "${BASE_URL}/users" \
@@ -93,23 +100,25 @@ create_user() {
 	if [[ "$http_code" != "201" ]]; then
 		echo "POST /users failed for ${name} (HTTP ${http_code}):" >&2
 		cat "$resp_body" >&2
+		rm -f "$resp_body"
 		exit 1
 	fi
 
-	jq -er '.id' "$resp_body"
+	local user_id
+	user_id="$(jq -er '.id' "$resp_body")"
+	rm -f "$resp_body"
+	printf '%s\n' "$user_id"
 }
 
 create_transaction() {
 	local user_id="$1"
 	local amount="$2"
 	local location="$3"
+	local resp_body=""
+	resp_body="$(mktemp)"
 
 	local body
-	body=$(jq -n \
-		--arg uid "$user_id" \
-		--argjson amount "$amount" \
-		--arg loc "$location" \
-		'{user_id: $uid, amount: $amount, location: $loc}')
+	body=$(printf '{"user_id":"%s","amount":%s,"location":"%s"}' "$user_id" "$amount" "$location")
 
 	local http_code
 	http_code=$(curl -sS -o "$resp_body" -w '%{http_code}' -X POST "${BASE_URL}/transactions" \
@@ -119,26 +128,80 @@ create_transaction() {
 	if [[ "$http_code" != "201" ]]; then
 		echo "POST /transactions failed (HTTP ${http_code}):" >&2
 		cat "$resp_body" >&2
+		rm -f "$resp_body"
 		exit 1
 	fi
+
+	rm -f "$resp_body"
 }
 
 echo "Base URL: ${BASE_URL}"
-echo "Users: ${USERS}, transactions per user: ${TX_PER_USER}"
+echo "Duration: ${DURATION}s"
+echo "Rate: ${RATE} req/s"
+echo "Parallel channels: ${CONCURRENCY}"
 echo
 
-for ((i = 1; i <= USERS; i++)); do
-	user_id=$(create_user "$i")
-	echo "Created user${i} id=${user_id}"
+process_channel() {
+	local channel_idx="$1"
+	local channel_rate="$2"
+	local user_idx="$channel_idx"
+	local user_id
+	local interval_s
+	local end_at
+	local next_user_rotation_at
+	local sent=0
+	local seq=1
+	local amount
+	local loc_idx
+	local location
 
-	for ((j = 1; j <= TX_PER_USER; j++)); do
-		amount=$((1000 + i * 100 + j))
-		loc_idx=$(((i + j - 1) % ${#LOCATIONS[@]}))
+	user_id=$(create_user "$user_idx")
+	echo "[ch${channel_idx}] created user${user_idx} id=${user_id}, channel_rate=${channel_rate} req/s"
+
+	if (( channel_rate <= 0 )); then
+		echo "[ch${channel_idx}] idle (assigned rate=0)"
+		return 0
+	fi
+
+	interval_s=$(awk "BEGIN { printf \"%.6f\", 1/${channel_rate} }")
+	end_at=$((SECONDS + DURATION))
+	next_user_rotation_at=$((SECONDS + USER_ROTATE_SECONDS))
+
+	while (( SECONDS < end_at )); do
+		if (( SECONDS >= next_user_rotation_at )); then
+			((user_idx += CONCURRENCY))
+			user_id=$(create_user "$user_idx")
+			echo "[ch${channel_idx}] switched to user${user_idx} id=${user_id}"
+			next_user_rotation_at=$((SECONDS + USER_ROTATE_SECONDS))
+		fi
+
+		amount=$((1000 + channel_idx * 100000 + seq))
+		loc_idx=$(((channel_idx + seq - 1) % ${#LOCATIONS[@]}))
 		location="${LOCATIONS[$loc_idx]}"
 		create_transaction "$user_id" "$amount" "$location"
-		echo "  transaction ${j}/${TX_PER_USER} amount=${amount} location=${location}"
+		((sent += 1))
+		((seq += 1))
+		sleep "$interval_s"
 	done
-	echo
+
+	echo "[ch${channel_idx}] sent ${sent} transactions in ${DURATION}s"
+}
+
+worker_pids=()
+base_rate=$((RATE / CONCURRENCY))
+remainder=$((RATE % CONCURRENCY))
+
+for ((channel = 1; channel <= CONCURRENCY; channel++)); do
+	channel_rate=$base_rate
+	if (( channel <= remainder )); then
+		((channel_rate += 1))
+	fi
+	process_channel "$channel" "$channel_rate" &
+	worker_pids+=("$!")
+done
+
+for pid in "${worker_pids[@]}"; do
+	wait "$pid"
 done
 
 echo "Done."
