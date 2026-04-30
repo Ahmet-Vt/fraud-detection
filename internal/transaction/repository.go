@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"fraud-detection/internal/domain"
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
@@ -17,6 +18,7 @@ type RepositoryInterface interface {
 	FindByUserID(userID uuid.UUID) ([]*domain.Transaction, error)
 	GetTripleAmountAverageLast24HoursByUserID(userID uuid.UUID) (int64, error)
 	Delete(id uuid.UUID) error
+	GetLastLocationByUserID(userID uuid.UUID) (string, error)
 }
 
 type Repository struct {
@@ -108,7 +110,7 @@ func (r *Repository) GetTripleAmountAverageLast24HoursByUserID(userID uuid.UUID)
 	var tripleAmountAverage int64
 
 	if err := r.db.Model(&domain.Transaction{}).
-		Select("COALESCE(AVG(amount), 0) * 3").
+		Select("COALESCE((AVG(amount) * 3)::bigint, 0)").
 		Where("user_id = ? AND created_at >= NOW() - INTERVAL '24 hours'", userID).
 		Scan(&tripleAmountAverage).Error; err != nil {
 		return 0, fmt.Errorf("get triple amount average last 24 hours by user id: %w", err)
@@ -128,7 +130,7 @@ func (r *Repository) Delete(id uuid.UUID) error {
 	return nil
 }
 
-func (r *Repository) GetLastLocationByUserTransactionID(userID uuid.UUID, _ uuid.UUID) (string, error) {
+func (r *Repository) GetLastLocationByUserID(userID uuid.UUID) (string, error) {
 	var transaction domain.Transaction
 	if err := r.db.Model(&domain.Transaction{}).
 		Select("location").

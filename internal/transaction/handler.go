@@ -24,10 +24,11 @@ type createTransactionRequest struct {
 type CreateTransactionRequest = createTransactionRequest
 
 type transactionResponse struct {
-	ID       uuid.UUID `json:"id" format:"uuid" example:"1dc90ef0-76a0-4cb2-891e-5193c60aa82f" extensions:"x-order=0"`
-	UserID   uuid.UUID `json:"user_id" format:"uuid" example:"4ca5e74c-3a07-4010-9f07-14e90a35868b" extensions:"x-order=1"`
-	Amount   int64     `json:"amount" example:"5000" extensions:"x-order=2"`
-	Location string    `json:"location" example:"Istanbul" extensions:"x-order=3"`
+	ID          uuid.UUID `json:"id" format:"uuid" example:"1dc90ef0-76a0-4cb2-891e-5193c60aa82f" extensions:"x-order=0"`
+	UserID      uuid.UUID `json:"user_id" format:"uuid" example:"4ca5e74c-3a07-4010-9f07-14e90a35868b" extensions:"x-order=1"`
+	Amount      int64     `json:"amount" example:"5000" extensions:"x-order=2"`
+	Location    string    `json:"location" example:"Istanbul" extensions:"x-order=3"`
+	FraudStatus bool      `json:"fraud_status" example:"false" extensions:"x-order=4"`
 }
 
 type TransactionResponse = transactionResponse
@@ -223,10 +224,11 @@ func (h *Handler) writeError(c *gin.Context, err error) {
 
 func toTransactionResponse(transaction *domain.Transaction) transactionResponse {
 	return transactionResponse{
-		ID:       transaction.ID,
-		UserID:   transaction.UserID,
-		Amount:   transaction.Amount,
-		Location: transaction.Location,
+		ID:          transaction.ID,
+		UserID:      transaction.UserID,
+		Amount:      transaction.Amount,
+		Location:    transaction.Location,
+		FraudStatus: transaction.FraudStatus,
 	}
 }
 

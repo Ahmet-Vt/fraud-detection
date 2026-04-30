@@ -5,23 +5,33 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"time"
 
 	"fraud-detection/internal/domain"
+
 	"github.com/google/uuid"
-	"github.com/redis/go-redis/v9"
 )
 
 type transactionCreatedPublisher interface {
 	PublishTransactionCreated(ctx context.Context, evt TransactionCreatedEvent) error
 }
 
+type transactionStateCache interface {
+	GetLastLocationByUserID(ctx context.Context, userID uuid.UUID) (string, bool, error)
+	SetLastLocationByUserID(ctx context.Context, userID uuid.UUID, location string) error
+	SetLastTransactionCreatedAtByUserID(ctx context.Context, userID uuid.UUID, createdAt time.Time) error
+	IncrementAndGetRequestCountByUserID(ctx context.Context, userID uuid.UUID, requestTime time.Time) (int, error)
+}
+
 type Service struct {
 	repository RepositoryInterface
 	publisher  transactionCreatedPublisher
-	cache      redis.Cmdable
+	cache      transactionStateCache
 }
 
-func NewService(repository RepositoryInterface, publisher transactionCreatedPublisher, cache redis.Cmdable) *Service {
+const requestCountFraudThreshold = 5
+
+func NewService(repository RepositoryInterface, publisher transactionCreatedPublisher, cache transactionStateCache) *Service {
 	return &Service{
 		repository: repository,
 		publisher:  publisher,
@@ -36,6 +46,22 @@ func (s *Service) CreateTransaction(ctx context.Context, transaction *domain.Tra
 
 	if err := s.repository.Create(transaction); err != nil {
 		return fmt.Errorf("create transaction: %w", err)
+	}
+
+	if err := s.SetLastLocationByUserID(ctx, transaction.UserID, transaction.Location); err != nil {
+		log.Printf("set last location cache after create transaction: %v", err)
+	}
+	if s.cache != nil {
+		if err := s.cache.SetLastTransactionCreatedAtByUserID(ctx, transaction.UserID, transaction.CreatedAt); err != nil {
+			log.Printf("set last transaction created at cache after create transaction: %v", err)
+		}
+	}
+	if s.cache != nil {
+		if requestCount, err := s.cache.IncrementAndGetRequestCountByUserID(ctx, transaction.UserID, transaction.CreatedAt); err != nil {
+			log.Printf("increment request count cache after create transaction: %v", err)
+		} else if requestCount > requestCountFraudThreshold {
+			log.Printf("user %s reached %d requests in last 1 minute", transaction.UserID, requestCount)
+		}
 	}
 
 	if s.publisher != nil {
@@ -96,6 +122,43 @@ func (s *Service) GetTripleAmountAverageLast24HoursByUserID(userID uuid.UUID) (i
 	}
 
 	return tripleAverage, nil
+}
+
+func (s *Service) GetLastLocationByUserID(ctx context.Context, userID uuid.UUID) (string, error) {
+	if s.cache != nil {
+		location, found, err := s.cache.GetLastLocationByUserID(ctx, userID)
+		if err == nil {
+			if found {
+				return location, nil
+			}
+		} else {
+			log.Printf("get last location cache: %v", err)
+		}
+	}
+
+	location, err := s.repository.GetLastLocationByUserID(userID)
+	if err != nil {
+		return "", fmt.Errorf("get last location by user transaction id: %w", err)
+	}
+
+	if location != "" {
+		if err := s.SetLastLocationByUserID(ctx, userID, location); err != nil {
+			log.Printf("set last location cache after db fetch: %v", err)
+		}
+	}
+
+	return location, nil
+}
+
+func (s *Service) SetLastLocationByUserID(ctx context.Context, userID uuid.UUID, location string) error {
+	if s.cache == nil {
+		return nil
+	}
+	if err := s.cache.SetLastLocationByUserID(ctx, userID, location); err != nil {
+		return fmt.Errorf("set last location by user id: %w", err)
+	}
+
+	return nil
 }
 
 func (s *Service) DeleteTransaction(id uuid.UUID) error {
