@@ -19,8 +19,10 @@ import (
 	"fraud-detection/migrations"
 
 	"github.com/gin-gonic/gin"
+	"github.com/redis/go-redis/v9"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
+	"gorm.io/gorm"
 )
 
 // @title Fraud Detection API
@@ -32,62 +34,28 @@ import (
 func main() {
 	cfg := config.Load()
 
-	db, err := database.NewPostgres(cfg.DB.DSN())
+	db, err := initDatabase(cfg)
 	if err != nil {
-		log.Fatal("failed to connect database: ", err)
+		log.Fatal(err)
 	}
-	sqlDB, err := db.DB()
+	if err := runMigrations(db); err != nil {
+		log.Fatal(err)
+	}
+
+	redisClient, err := initRedis(cfg)
 	if err != nil {
-		log.Fatal("failed to get database sql instance: ", err)
+		log.Fatal(err)
 	}
-	sqlDB.SetMaxOpenConns(cfg.DB.MaxOpenConns)
-	sqlDB.SetMaxIdleConns(cfg.DB.MaxIdleConns)
-	sqlDB.SetConnMaxLifetime(time.Duration(cfg.DB.ConnMaxLifetime) * time.Minute)
-	sqlDB.SetConnMaxIdleTime(time.Duration(cfg.DB.ConnMaxIdleTime) * time.Minute)
+	defer closeRedis(redisClient)
 
-	migrator := database.NewMigrator(db)
-	if err := migrations.Register(migrator); err != nil {
-		log.Fatal("failed to register migrations: ", err)
-	}
-
-	if err := migrator.Run(); err != nil {
-		log.Fatal("migrations failed: ", err)
-	}
-
-	redisClient, err := cache.NewRedis(
-		context.Background(),
-		cfg.Redis.Addr(),
-	)
-
+	rabbitMQClient, err := initRabbitMQ(cfg)
 	if err != nil {
-		log.Fatal("failed to connect redis: ", err)
+		log.Fatal(err)
 	}
-	defer func() {
-		if err := redisClient.Close(); err != nil {
-			log.Printf("failed to close redis client: %v", err)
-		}
-	}()
-
-	rabbitMQClient, err := rabbitmq.New(cfg.RabbitMQ.AMQPURL())
-	if err != nil {
-		log.Fatal("failed to connect rabbitmq: ", err)
-	}
-	defer func() {
-		if err := rabbitMQClient.Close(); err != nil {
-			log.Printf("failed to close rabbitmq client: %v", err)
-		}
-	}()
-
-	if err := rabbitMQClient.DeclareTopology(); err != nil {
-		log.Fatal("failed to declare rabbitmq topology: ", err)
-	}
+	defer closeRabbitMQ(rabbitMQClient)
 
 	publisher := rabbitmq.NewPublisher(rabbitMQClient)
-	defer func() {
-		if err := publisher.Close(); err != nil {
-			log.Printf("failed to close rabbitmq publisher: %v", err)
-		}
-	}()
+	defer closePublisher(publisher)
 
 	userRepository := user.NewRepository(db)
 	userService := user.NewService(userRepository)
@@ -98,8 +66,97 @@ func main() {
 	transactionService := transaction.NewService(transactionRepository, publisher, transactionStateCache)
 	transactionHandler := transaction.NewHandler(transactionService)
 	fraudService := fraud.NewService(transactionService, transactionStateCache)
-	workerPool := worker.NewPool(fraudService)
+	workerPool := worker.NewFraudWorker(fraudService)
 
+	startFraudConsumers(cfg, rabbitMQClient, workerPool)
+
+	router := gin.Default()
+	router.GET("/health", healthHandler(db, redisClient, rabbitMQClient))
+	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	userHandler.RegisterRoutes(router)
+	transactionHandler.RegisterRoutes(router)
+
+	if err := router.Run(); err != nil {
+		log.Fatal(err)
+	}
+}
+
+func initDatabase(cfg config.AppConfig) (*gorm.DB, error) {
+	db, err := database.NewPostgres(cfg.DB.DSN())
+	if err != nil {
+		return nil, fmt.Errorf("connect database: %w", err)
+	}
+
+	sqlDB, err := db.DB()
+	if err != nil {
+		return nil, fmt.Errorf("get sql database instance: %w", err)
+	}
+	sqlDB.SetMaxOpenConns(cfg.DB.MaxOpenConns)
+	sqlDB.SetMaxIdleConns(cfg.DB.MaxIdleConns)
+	sqlDB.SetConnMaxLifetime(time.Duration(cfg.DB.ConnMaxLifetime) * time.Minute)
+	sqlDB.SetConnMaxIdleTime(time.Duration(cfg.DB.ConnMaxIdleTime) * time.Minute)
+
+	return db, nil
+}
+
+func runMigrations(db *gorm.DB) error {
+	migrator := database.NewMigrator(db)
+	if err := migrations.Register(migrator); err != nil {
+		return fmt.Errorf("register migrations: %w", err)
+	}
+
+	if err := migrator.Run(); err != nil {
+		return fmt.Errorf("run migrations: %w", err)
+	}
+
+	return nil
+}
+
+func initRedis(cfg config.AppConfig) (*redis.Client, error) {
+	redisClient, err := cache.NewRedis(
+		context.Background(),
+		cfg.Redis.Addr(),
+	)
+
+	if err != nil {
+		return nil, fmt.Errorf("connect redis: %w", err)
+	}
+
+	return redisClient, nil
+}
+
+func closeRedis(redisClient *redis.Client) {
+	if err := redisClient.Close(); err != nil {
+		log.Printf("failed to close redis client: %v", err)
+	}
+}
+
+func initRabbitMQ(cfg config.AppConfig) (*rabbitmq.Client, error) {
+	rabbitMQClient, err := rabbitmq.New(cfg.RabbitMQ.AMQPURL())
+	if err != nil {
+		return nil, fmt.Errorf("connect rabbitmq: %w", err)
+	}
+
+	if err := rabbitMQClient.DeclareTopology(); err != nil {
+		return nil, fmt.Errorf("declare rabbitmq topology: %w", err)
+	}
+
+	return rabbitMQClient, nil
+}
+
+func closeRabbitMQ(rabbitMQClient *rabbitmq.Client) {
+	if err := rabbitMQClient.Close(); err != nil {
+		log.Printf("failed to close rabbitmq client: %v", err)
+	}
+}
+
+func closePublisher(publisher *rabbitmq.Publisher) {
+	if err := publisher.Close(); err != nil {
+		log.Printf("failed to close rabbitmq publisher: %v", err)
+	}
+}
+
+func startFraudConsumers(cfg config.AppConfig, rabbitMQClient *rabbitmq.Client, workerPool *worker.FraudWorker) {
 	for i := 1; i <= cfg.RabbitMQ.ConsumerCount; i++ {
 		tag := fmt.Sprintf("fraud-worker-%d", i)
 		fraudConsumer := rabbitmq.NewConsumer(
@@ -116,18 +173,5 @@ func main() {
 				log.Printf("rabbitmq consumer stopped tag=%s: %v", consumerTag, err)
 			}
 		}(tag, fraudConsumer)
-	}
-
-	router := gin.Default()
-
-	router.GET("/health", healthHandler(db, redisClient, rabbitMQClient))
-
-	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-
-	userHandler.RegisterRoutes(router)
-	transactionHandler.RegisterRoutes(router)
-
-	if err := router.Run(); err != nil {
-		log.Fatal("failed to start server: ", err)
 	}
 }

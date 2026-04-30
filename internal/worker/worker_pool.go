@@ -13,38 +13,38 @@ import (
 	"github.com/google/uuid"
 )
 
-type transactionService interface {
+type fraudService interface {
 	EvaluateTransaction(ctx context.Context, transactionID uuid.UUID, userID uuid.UUID) ([]domain.TransactionFraudRule, error)
 }
 
-type Pool struct {
-	transactionService transactionService
+type FraudWorker struct {
+	fraudService fraudService
 }
 
-func NewPool(transactionService transactionService) *Pool {
-	return &Pool{
-		transactionService: transactionService,
+func NewFraudWorker(fraudService fraudService) *FraudWorker {
+	return &FraudWorker{
+		fraudService: fraudService,
 	}
 }
 
-func (p *Pool) HandleTransactionCreated(ctx context.Context, evt rabbitmq.TransactionCreatedMessage) error {
-	if p == nil || p.transactionService == nil {
-		return fmt.Errorf("worker pool: nil transaction service")
+func (p *FraudWorker) HandleTransactionCreated(ctx context.Context, evt rabbitmq.TransactionCreatedMessage) error {
+	if p == nil || p.fraudService == nil {
+		return fmt.Errorf("worker FraudWorker: nil transaction service")
 	}
 
 	transactionID, err := uuid.Parse(evt.TransactionID)
 	if err != nil {
-		return fmt.Errorf("worker pool: %w", errors.Join(fraud.ErrInvalidTransactionID, err))
+		return fmt.Errorf("worker FraudWorker: %w", errors.Join(fraud.ErrInvalidTransactionID, err))
 	}
 
 	userID, err := uuid.Parse(evt.UserID)
 	if err != nil {
-		return fmt.Errorf("worker pool: %w", errors.Join(fraud.ErrInvalidUserID, err))
+		return fmt.Errorf("worker FraudWorker: %w", errors.Join(fraud.ErrInvalidUserID, err))
 	}
 
-	rules, err := p.transactionService.EvaluateTransaction(ctx, transactionID, userID)
+	rules, err := p.fraudService.EvaluateTransaction(ctx, transactionID, userID)
 	if err != nil {
-		return fmt.Errorf("worker pool: evaluate transaction: %w", err)
+		return fmt.Errorf("worker FraudWorker: evaluate transaction: %w", err)
 	}
 
 	matchedRules := 0
