@@ -6,24 +6,31 @@ import (
 	"net"
 	"net/url"
 	"os"
+	"strconv"
 
 	"github.com/joho/godotenv"
 )
 
 type DBConfig struct {
-	DBHost     string
-	DBPort     string
-	DBUser     string
-	DBPassword string
-	DBName     string
-	DBSSLMode  string
+	DBHost          string
+	DBPort          string
+	DBUser          string
+	DBPassword      string
+	DBName          string
+	DBSSLMode       string
+	MaxOpenConns    int
+	MaxIdleConns    int
+	ConnMaxLifetime int
+	ConnMaxIdleTime int
 }
 
 type RabbitMQConfig struct {
-	Host     string
-	Port     string
-	User     string
-	Password string
+	Host          string
+	Port          string
+	User          string
+	Password      string
+	ConsumerCount int
+	PrefetchCount int
 }
 
 type RedisConfig struct {
@@ -76,18 +83,24 @@ func loadEnv() {
 func loadConfig() AppConfig {
 	return AppConfig{
 		DB: DBConfig{
-			DBHost:     requireEnv("POSTGRES_HOST"),
-			DBPort:     requireEnv("POSTGRES_PORT"),
-			DBUser:     requireEnv("POSTGRES_USER"),
-			DBPassword: requireEnv("POSTGRES_PASSWORD"),
-			DBName:     requireEnv("POSTGRES_DB"),
-			DBSSLMode:  requireEnv("POSTGRES_SSLMODE"),
+			DBHost:          requireEnv("POSTGRES_HOST"),
+			DBPort:          requireEnv("POSTGRES_PORT"),
+			DBUser:          requireEnv("POSTGRES_USER"),
+			DBPassword:      requireEnv("POSTGRES_PASSWORD"),
+			DBName:          requireEnv("POSTGRES_DB"),
+			DBSSLMode:       requireEnv("POSTGRES_SSLMODE"),
+			MaxOpenConns:    envIntOrDefault("POSTGRES_MAX_OPEN_CONNS", 40),
+			MaxIdleConns:    envIntOrDefault("POSTGRES_MAX_IDLE_CONNS", 20),
+			ConnMaxLifetime: envIntOrDefault("POSTGRES_CONN_MAX_LIFETIME_MINUTES", 30),
+			ConnMaxIdleTime: envIntOrDefault("POSTGRES_CONN_MAX_IDLE_TIME_MINUTES", 5),
 		},
 		RabbitMQ: RabbitMQConfig{
-			Host:     requireEnv("RABBITMQ_HOST"),
-			Port:     requireEnv("RABBITMQ_PORT"),
-			User:     requireEnv("RABBITMQ_USER"),
-			Password: requireEnv("RABBITMQ_PASSWORD"),
+			Host:          requireEnv("RABBITMQ_HOST"),
+			Port:          requireEnv("RABBITMQ_PORT"),
+			User:          requireEnv("RABBITMQ_USER"),
+			Password:      requireEnv("RABBITMQ_PASSWORD"),
+			ConsumerCount: envIntOrDefault("RABBITMQ_CONSUMER_COUNT", 4),
+			PrefetchCount: envIntOrDefault("RABBITMQ_PREFETCH_COUNT", 20),
 		},
 		Redis: RedisConfig{
 			Host: requireEnv("REDIS_HOST"),
@@ -102,4 +115,19 @@ func requireEnv(key string) string {
 		log.Fatalf("missing required env var: %s", key)
 	}
 	return val
+}
+
+func envIntOrDefault(key string, defaultValue int) int {
+	val := os.Getenv(key)
+	if val == "" {
+		return defaultValue
+	}
+
+	parsed, err := strconv.Atoi(val)
+	if err != nil || parsed <= 0 {
+		log.Printf("invalid %s=%q, using default %d", key, val, defaultValue)
+		return defaultValue
+	}
+
+	return parsed
 }
