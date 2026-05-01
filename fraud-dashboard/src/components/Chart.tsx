@@ -19,18 +19,19 @@ type ChartProps = {
 
 export default function Chart({ data, requestCount, fraudCount }: ChartProps) {
   const { isXs, isMd, isSm, ui } = useScreen()
+  const chartData = useMemo(() => data.map((point, index) => ({ ...point, pointIndex: index })), [data])
   const xAxisTicks = useMemo(() => {
-    if (data.length === 0) return []
-    const ticks: string[] = []
-    for (let i = 0; i < data.length; i += 60) {
-      ticks.push(data[i].minuteLabel)
+    if (chartData.length === 0) return []
+    const ticks: number[] = []
+    for (let i = 0; i < chartData.length; i += 60) {
+      ticks.push(i)
     }
-    const lastTick = data[data.length - 1].minuteLabel
+    const lastTick = chartData.length - 1
     if (ticks[ticks.length - 1] !== lastTick) {
       ticks.push(lastTick)
     }
     return ticks
-  }, [data])
+  }, [chartData.length])
 
   return (
     <div className="card bg-base-100 shadow-md">
@@ -49,7 +50,7 @@ export default function Chart({ data, requestCount, fraudCount }: ChartProps) {
         <div className={`${ui.chartHeight} w-full`}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
-              data={data}
+              data={chartData}
               margin={{
                 top: 8,
                 right: isSm ? 4 : 8,
@@ -59,9 +60,13 @@ export default function Chart({ data, requestCount, fraudCount }: ChartProps) {
             >
               {ui.chartGridVisible && <CartesianGrid strokeDasharray="3 3" />}
               <XAxis
-                dataKey="minuteLabel"
+                dataKey="pointIndex"
+                type="number"
                 ticks={xAxisTicks}
-                tickFormatter={(value: string) => value.slice(0, 5)}
+                tickFormatter={(value: number) => {
+                  const label = chartData[value]?.minuteLabel
+                  return label ? label.slice(0, 5) : ''
+                }}
                 minTickGap={isSm ? 24 : isMd ? 20 : 32}
               />
               <YAxis
@@ -73,6 +78,12 @@ export default function Chart({ data, requestCount, fraudCount }: ChartProps) {
               />
               <Tooltip
                 filterNull={false}
+                labelFormatter={(value) => {
+                  const index = Number(value)
+                  const point = chartData[index]
+                  if (!point) return 'Time: --:--:--'
+                  return `Time: ${point.minuteLabel} | Requests: ${point.requestCount} | Fraud: ${point.fraudCount}`
+                }}
                 formatter={(value) =>
                   value == null ? ['No data yet', 'Anomaly Rate'] : [`${Number(value).toFixed(2)}%`, 'Anomaly Rate']
                 }
