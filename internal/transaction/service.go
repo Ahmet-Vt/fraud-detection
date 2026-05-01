@@ -43,6 +43,9 @@ func (s *Service) CreateTransaction(ctx context.Context, transaction *domain.Tra
 	if transaction == nil {
 		return fmt.Errorf("create transaction: %w", errors.New("nil transaction"))
 	}
+	if transaction.TransactionStatus == "" {
+		transaction.TransactionStatus = domain.TransactionStatusPending
+	}
 
 	if err := s.repository.Create(transaction); err != nil {
 		return fmt.Errorf("create transaction: %w", err)
@@ -83,6 +86,14 @@ func (s *Service) CreateTransaction(ctx context.Context, transaction *domain.Tra
 func (s *Service) UpdateFraudRules(transactionID uuid.UUID, rules []domain.TransactionFraudRule) error {
 	if err := s.repository.UpdateFraudRules(transactionID, rules); err != nil {
 		return fmt.Errorf("replace fraud rules: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Service) UpdateTransactionStatus(transactionID uuid.UUID, status domain.Status) error {
+	if err := s.repository.UpdateStatus(transactionID, status); err != nil {
+		return fmt.Errorf("update transaction status: %w", err)
 	}
 
 	return nil

@@ -13,6 +13,7 @@ import (
 type RepositoryInterface interface {
 	Create(transaction *domain.Transaction) error
 	UpdateFraudRules(transactionID uuid.UUID, rules []domain.TransactionFraudRule) error
+	UpdateStatus(transactionID uuid.UUID, status domain.Status) error
 	FindByID(id uuid.UUID) (*domain.Transaction, error)
 	FindAll() ([]*domain.Transaction, error)
 	FindByUserID(userID uuid.UUID) ([]*domain.Transaction, error)
@@ -67,7 +68,10 @@ func (r *Repository) UpdateFraudRules(transactionID uuid.UUID, rules []domain.Tr
 
 		result := tx.Model(&domain.Transaction{}).
 			Where("id = ?", transactionID).
-			Update("fraud_status", matchedRules >= 2)
+			Updates(map[string]any{
+				"fraud_status":       matchedRules >= 2,
+				"transaction_status": domain.TransactionStatusCompleted,
+			})
 		if result.Error != nil {
 			return fmt.Errorf("update fraud rules: %w", result.Error)
 		}
@@ -77,6 +81,20 @@ func (r *Repository) UpdateFraudRules(transactionID uuid.UUID, rules []domain.Tr
 
 		return nil
 	})
+}
+
+func (r *Repository) UpdateStatus(transactionID uuid.UUID, status domain.Status) error {
+	result := r.db.Model(&domain.Transaction{}).
+		Where("id = ?", transactionID).
+		Update("transaction_status", status)
+	if result.Error != nil {
+		return fmt.Errorf("update transaction status: %w", result.Error)
+	}
+	if result.RowsAffected == 0 {
+		return fmt.Errorf("update transaction status: %w", ErrTransactionNotFound)
+	}
+
+	return nil
 }
 
 func (r *Repository) FindByID(id uuid.UUID) (*domain.Transaction, error) {

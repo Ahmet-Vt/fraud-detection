@@ -70,7 +70,7 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "Creates a new transaction for a user. HTTP 400 is INVALID_REQUEST_BODY for malformed JSON or binding errors, or USER_NOT_EXISTS when user_id is unknown.",
+                "description": "Creates a new transaction for a user.",
                 "consumes": [
                     "application/json"
                 ],
@@ -516,6 +516,19 @@ const docTemplate = `{
                 }
             }
         },
+        "domain.Status": {
+            "type": "string",
+            "enum": [
+                "pending",
+                "completed",
+                "failed"
+            ],
+            "x-enum-varnames": [
+                "TransactionStatusPending",
+                "TransactionStatusCompleted",
+                "TransactionStatusFailed"
+            ]
+        },
         "domain.UserStatus": {
             "type": "string",
             "enum": [
@@ -622,9 +635,23 @@ const docTemplate = `{
                     "x-order": "3",
                     "example": "Istanbul"
                 },
+                "transaction_status": {
+                    "enum": [
+                        "pending",
+                        "completed",
+                        "failed"
+                    ],
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/domain.Status"
+                        }
+                    ],
+                    "x-order": "4",
+                    "example": "pending"
+                },
                 "fraud_status": {
                     "type": "boolean",
-                    "x-order": "4",
+                    "x-order": "5",
                     "example": false
                 }
             }

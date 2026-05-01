@@ -66,7 +66,7 @@ func main() {
 	transactionService := transaction.NewService(transactionRepository, publisher, transactionStateCache)
 	transactionHandler := transaction.NewHandler(transactionService)
 	fraudService := fraud.NewService(transactionService, transactionStateCache)
-	workerPool := worker.NewFraudWorker(fraudService)
+	workerPool := worker.NewFraudWorker(fraudService, transactionService)
 
 	startFraudConsumers(cfg, rabbitMQClient, workerPool)
 

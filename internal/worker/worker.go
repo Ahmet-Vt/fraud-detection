@@ -17,13 +17,19 @@ type fraudService interface {
 	EvaluateTransaction(ctx context.Context, transactionID uuid.UUID, userID uuid.UUID) ([]domain.TransactionFraudRule, error)
 }
 
-type FraudWorker struct {
-	fraudService fraudService
+type transactionStatusUpdater interface {
+	UpdateTransactionStatus(transactionID uuid.UUID, status domain.Status) error
 }
 
-func NewFraudWorker(fraudService fraudService) *FraudWorker {
+type FraudWorker struct {
+	fraudService       fraudService
+	transactionService transactionStatusUpdater
+}
+
+func NewFraudWorker(fraudService fraudService, transactionService transactionStatusUpdater) *FraudWorker {
 	return &FraudWorker{
-		fraudService: fraudService,
+		fraudService:       fraudService,
+		transactionService: transactionService,
 	}
 }
 
@@ -39,11 +45,13 @@ func (p *FraudWorker) HandleTransactionCreated(ctx context.Context, evt rabbitmq
 
 	userID, err := uuid.Parse(evt.UserID)
 	if err != nil {
+		p.markTransactionFailed(transactionID)
 		return fmt.Errorf("worker FraudWorker: %w", errors.Join(fraud.ErrInvalidUserID, err))
 	}
 
 	rules, err := p.fraudService.EvaluateTransaction(ctx, transactionID, userID)
 	if err != nil {
+		p.markTransactionFailed(transactionID)
 		return fmt.Errorf("worker FraudWorker: evaluate transaction: %w", err)
 	}
 
@@ -70,4 +78,13 @@ func (p *FraudWorker) HandleTransactionCreated(ctx context.Context, evt rabbitmq
 	)
 
 	return nil
+}
+
+func (p *FraudWorker) markTransactionFailed(transactionID uuid.UUID) {
+	if p == nil || p.transactionService == nil {
+		return
+	}
+	if err := p.transactionService.UpdateTransactionStatus(transactionID, domain.TransactionStatusFailed); err != nil {
+		log.Printf("worker: mark transaction failed transaction_id=%s: %v", transactionID, err)
+	}
 }

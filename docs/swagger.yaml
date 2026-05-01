@@ -99,6 +99,16 @@ definitions:
         type: string
         x-order: "1"
     type: object
+  domain.Status:
+    enum:
+    - pending
+    - completed
+    - failed
+    type: string
+    x-enum-varnames:
+    - TransactionStatusPending
+    - TransactionStatusCompleted
+    - TransactionStatusFailed
   domain.UserStatus:
     enum:
     - active
@@ -170,7 +180,7 @@ definitions:
       fraud_status:
         example: false
         type: boolean
-        x-order: "4"
+        x-order: "5"
       id:
         example: 1dc90ef0-76a0-4cb2-891e-5193c60aa82f
         format: uuid
@@ -180,6 +190,15 @@ definitions:
         example: Istanbul
         type: string
         x-order: "3"
+      transaction_status:
+        allOf:
+        - $ref: '#/definitions/domain.Status'
+        enum:
+        - pending
+        - completed
+        - failed
+        example: pending
+        x-order: "4"
       user_id:
         example: 4ca5e74c-3a07-4010-9f07-14e90a35868b
         format: uuid
@@ -295,8 +314,7 @@ paths:
     post:
       consumes:
       - application/json
-      description: Creates a new transaction for a user. HTTP 400 is INVALID_REQUEST_BODY
-        for malformed JSON or binding errors, or USER_NOT_EXISTS when user_id is unknown.
+      description: Creates a new transaction for a user.
       parameters:
       - description: Create transaction payload
         in: body
