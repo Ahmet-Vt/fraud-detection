@@ -4,6 +4,8 @@ import './index.css'
 import App from './App.tsx'
 import { ScreenProvider } from './config/ScreenContext.tsx'
 
+document.documentElement.setAttribute('data-theme', 'light')
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ScreenProvider>
