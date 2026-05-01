@@ -7,6 +7,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
+import { useScreen } from '../config/ScreenContext'
 
 type DailyMetric = {
   day: string
@@ -24,21 +25,23 @@ const weeklyData: DailyMetric[] = [
 ]
 
 export default function Chart() {
+  const { isMd, ui } = useScreen()
+
   return (
     <div className="card bg-base-100 shadow-md">
-      <div className="card-body">
+      <div className={`card-body ${ui.cardBodyPadding}`}>
         <div className="flex items-center justify-between gap-2">
-          <h2 className="card-title">7-Day Suspicious Rate</h2>
-          <span className="badge badge-outline">Daily</span>
+          <h2 className={`card-title ${ui.cardTitleText}`}>7-Day Suspicious Rate</h2>
+          <span className={`badge badge-outline ${ui.badgeSize}`}>Daily</span>
         </div>
 
-        <div className="h-72 w-full">
+        <div className={`${ui.chartHeight} w-full`}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
               data={weeklyData}
-              margin={{ top: 8, right: 8, bottom: 8, left: 0 }}
+              margin={{ top: 8, right: isMd ? 0 : 8, bottom: 8, left: isMd ? -24 : 0 }}
             >
-              <CartesianGrid strokeDasharray="3 3" />
+              {ui.chartGridVisible && <CartesianGrid strokeDasharray="3 3" />}
               <XAxis dataKey="day" />
               <YAxis unit="%" domain={[0, 15]} />
               <Tooltip
@@ -49,8 +52,8 @@ export default function Chart() {
                 dataKey="suspiciousRate"
                 stroke="#ef4444"
                 strokeWidth={2}
-                dot={{ r: 3 }}
-                activeDot={{ r: 5 }}
+                dot={{ r: ui.chartDotR }}
+                activeDot={{ r: ui.chartActiveDotR }}
               />
             </LineChart>
           </ResponsiveContainer>

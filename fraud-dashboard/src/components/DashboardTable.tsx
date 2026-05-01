@@ -1,3 +1,5 @@
+import { useScreen } from '../config/ScreenContext'
+
 type TransactionRow = {
   id: string
   userId: string
@@ -49,38 +51,42 @@ function statusClass(status: TransactionRow['status']) {
 }
 
 export default function DashboardTable() {
+  const { isMd, ui } = useScreen()
+
   return (
     <div className="card bg-base-100 shadow-md">
-      <div className="card-body">
+      <div className={`card-body ${ui.cardBodyPadding}`}>
         <div className="flex items-center justify-between gap-2">
-          <h2 className="card-title">Live Transaction Feed</h2>
-          <span className="badge badge-info badge-outline">Last 4 events</span>
+          <h2 className={`card-title ${ui.cardTitleText}`}>Live Transaction Feed</h2>
+          <span className={`badge badge-info badge-outline ${ui.badgeSize}`}>Last 4 events</span>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="table table-zebra">
+          <table className={`table table-zebra ${ui.tableSize}`}>
             <thead>
-              <tr>
+              <tr className={ui.tableCellText}>
                 <th>Transaction</th>
                 <th>User</th>
                 <th>Amount</th>
-                <th>Location</th>
+                {!isMd && <th>Location</th>}
                 <th>Status</th>
                 <th>Fraud</th>
               </tr>
             </thead>
             <tbody>
               {rows.map((row) => (
-                <tr key={row.id}>
+                <tr key={row.id} className={ui.tableCellText}>
                   <td className="font-medium">{row.id}</td>
                   <td>{row.userId}</td>
                   <td>${row.amount.toLocaleString()}</td>
-                  <td>{row.location}</td>
+                  {!isMd && <td>{row.location}</td>}
                   <td>
-                    <span className={statusClass(row.status)}>{row.status}</span>
+                    <span className={`${statusClass(row.status)} ${ui.badgeSize}`}>{row.status}</span>
                   </td>
                   <td>
-                    <span className={row.fraud ? 'badge badge-error' : 'badge badge-success'}>
+                    <span
+                      className={`${row.fraud ? 'badge badge-error' : 'badge badge-success'} ${ui.badgeSize}`}
+                    >
                       {row.fraud ? 'suspicious' : 'approved'}
                     </span>
                   </td>

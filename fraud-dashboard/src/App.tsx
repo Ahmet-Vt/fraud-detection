@@ -1,11 +1,14 @@
 import DashboardTable from './components/DashboardTable'
 import Chart from './components/Chart'
+import { useScreen } from './config/ScreenContext'
 
 function App() {
+  const { ui } = useScreen()
+
   return (
-    <main className="min-h-screen bg-base-200 p-4 md:p-8">
-      <div className="mx-auto max-w-6xl space-y-4">
-        <h1 className="text-2xl font-semibold">Fraud Dashboard</h1>
+    <main className={`min-h-screen bg-base-200 ${ui.pagePadding}`}>
+      <div className={`mx-auto ${ui.containerWidth} ${ui.stackGap}`}>
+        <h1 className={`${ui.titleText} font-semibold`}>Fraud Dashboard</h1>
         <Chart />
         <DashboardTable />
       </div>
