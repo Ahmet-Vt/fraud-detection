@@ -55,7 +55,7 @@ export default function Chart({ data, requestCount, fraudCount }: ChartProps) {
                 top: 8,
                 right: isSm ? 4 : 8,
                 bottom: isSm ? 0 : 8,
-                left: isSm ? 0 : isMd ? -8 : 0,
+                left: isSm ? 2 : 8,
               }}
             >
               {ui.chartGridVisible && <CartesianGrid strokeDasharray="3 3" />}
@@ -74,7 +74,7 @@ export default function Chart({ data, requestCount, fraudCount }: ChartProps) {
                 domain={[0, 100]}
                 ticks={[0, 25, 50, 75, 100]}
                 allowDecimals={false}
-                width={isXs ? 30 : isSm ? 34 : 40}
+                width={isXs ? 38 : isSm ? 44 : isMd ? 48 : 52}
               />
               <Tooltip
                 filterNull={false}
