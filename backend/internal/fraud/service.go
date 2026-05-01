@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"sort"
 	"strings"
 	"sync"
 	"time"
@@ -22,7 +21,7 @@ const (
 
 type transactionReaderWriter interface {
 	GetTransactionByID(id uuid.UUID) (*domain.Transaction, error)
-	GetTransactionsByUserID(userID uuid.UUID) ([]*domain.Transaction, error)
+	GetPreviousTransactionByUserID(userID uuid.UUID, before time.Time) (*domain.Transaction, bool, error)
 	GetTripleAmountAverageLast24HoursByUserID(userID uuid.UUID, excludeTxID *uuid.UUID) (int64, error)
 	UpdateFraudRules(transactionID uuid.UUID, rules []domain.TransactionFraudRule) error
 }
@@ -62,12 +61,11 @@ func (s *Service) EvaluateTransaction(ctx context.Context, transactionID uuid.UU
 		return nil, fmt.Errorf("evaluate transaction: %w", errors.Join(ErrTransactionLookupFailed, err))
 	}
 
-	transactions, err := s.transactionService.GetTransactionsByUserID(userID)
+	previousTransaction, hasPrevious, err := s.transactionService.GetPreviousTransactionByUserID(userID, currentTransaction.CreatedAt)
 	if err != nil {
 		return nil, fmt.Errorf("evaluate transaction: %w", errors.Join(ErrUserTransactionsFailed, err))
 	}
 
-	previousTransaction, hasPrevious := findPreviousTransaction(transactions, transactionID)
 	cacheInputs, err := s.loadCachedRuleInputs(ctx, currentTransaction)
 	if err != nil {
 		return nil, fmt.Errorf("evaluate transaction: %w", errors.Join(ErrFraudRuleEvaluation, err))
@@ -286,7 +284,12 @@ func (s *Service) evaluateLocationRule(
 		currentCoordinates.Lat,
 		currentCoordinates.Lon,
 	)
-	reachable := distance.IsReachableWithPlane(kmDistance, previousCreatedAt)
+	elapsed := currentTransaction.CreatedAt.Sub(previousCreatedAt)
+	if elapsed < 0 {
+		return false, nil
+	}
+
+	reachable := distance.IsReachableWithPlane(kmDistance, elapsed)
 
 	return !reachable, nil
 }
@@ -341,33 +344,6 @@ func (s *Service) loadCachedRuleInputs(ctx context.Context, currentTransaction *
 	result.hasRequestCount = true
 
 	return result, nil
-}
-
-func findPreviousTransaction(transactions []*domain.Transaction, currentTransactionID uuid.UUID) (*domain.Transaction, bool) {
-	if len(transactions) == 0 {
-		return nil, false
-	}
-
-	sorted := make([]*domain.Transaction, 0, len(transactions))
-	for _, tx := range transactions {
-		if tx == nil {
-			continue
-		}
-		sorted = append(sorted, tx)
-	}
-
-	sort.Slice(sorted, func(i, j int) bool {
-		return sorted[i].CreatedAt.After(sorted[j].CreatedAt)
-	})
-
-	for _, tx := range sorted {
-		if tx.ID == currentTransactionID {
-			continue
-		}
-		return tx, true
-	}
-
-	return nil, false
 }
 
 func normalizeCity(city string) string {

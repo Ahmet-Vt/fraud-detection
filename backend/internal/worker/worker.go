@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"time"
 
 	"fraud-detection/internal/domain"
 	"fraud-detection/internal/fraud"
@@ -49,9 +50,18 @@ func (p *FraudWorker) HandleTransactionCreated(ctx context.Context, evt rabbitmq
 		return fmt.Errorf("worker FraudWorker: %w", errors.Join(fraud.ErrInvalidUserID, err))
 	}
 
+	evaluationStartedAt := time.Now()
 	rules, err := p.fraudService.EvaluateTransaction(ctx, transactionID, userID)
+	evaluationDurationMs := time.Since(evaluationStartedAt).Milliseconds()
 	if err != nil {
 		p.markTransactionFailed(transactionID)
+		log.Printf(
+			"worker: fraud evaluation failed transaction_id=%s user_id=%s evaluate_transaction_duration_ms=%d error=%v",
+			transactionID,
+			userID,
+			evaluationDurationMs,
+			err,
+		)
 		return fmt.Errorf("worker FraudWorker: evaluate transaction: %w", err)
 	}
 
@@ -70,11 +80,12 @@ func (p *FraudWorker) HandleTransactionCreated(ctx context.Context, evt rabbitmq
 	}
 	fraudStatus := matchedRules >= 2
 	log.Printf(
-		"worker: fraud evaluation transaction_id=%s user_id=%s matched_rules=%d fraud_status=%t",
+		"worker: fraud evaluation transaction_id=%s user_id=%s matched_rules=%d fraud_status=%t evaluate_transaction_duration_ms=%d",
 		transactionID,
 		userID,
 		matchedRules,
 		fraudStatus,
+		evaluationDurationMs,
 	)
 
 	return nil

@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"fraud-detection/internal/domain"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
@@ -17,6 +18,7 @@ type RepositoryInterface interface {
 	FindByID(id uuid.UUID) (*domain.Transaction, error)
 	FindAll() ([]*domain.Transaction, error)
 	FindByUserID(userID uuid.UUID) ([]*domain.Transaction, error)
+	FindPreviousByUserID(userID uuid.UUID, before time.Time) (*domain.Transaction, bool, error)
 	GetTripleAmountAverageLast24HoursByUserID(userID uuid.UUID, excludeTxID *uuid.UUID) (int64, error)
 	Delete(id uuid.UUID) error
 	GetLastLocationByUserID(userID uuid.UUID) (string, error)
@@ -122,6 +124,21 @@ func (r *Repository) FindByUserID(userID uuid.UUID) ([]*domain.Transaction, erro
 		return nil, fmt.Errorf("find transactions by user id: %w", err)
 	}
 	return transactions, nil
+}
+
+func (r *Repository) FindPreviousByUserID(userID uuid.UUID, before time.Time) (*domain.Transaction, bool, error) {
+	var transaction domain.Transaction
+	if err := r.db.
+		Where("user_id = ? AND created_at < ?", userID, before).
+		Order("created_at DESC").
+		Take(&transaction).Error; err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, false, nil
+		}
+		return nil, false, fmt.Errorf("find previous transaction by user id: %w", err)
+	}
+
+	return &transaction, true, nil
 }
 
 func (r *Repository) GetTripleAmountAverageLast24HoursByUserID(userID uuid.UUID, excludeTxID *uuid.UUID) (int64, error) {

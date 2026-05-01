@@ -44,9 +44,32 @@ var CreateTransactionsTable = database.MigrationEntry{
 			return err
 		}
 
-		return tx.Exec(`CREATE INDEX idx_transactions_fraud_status ON transactions(fraud_status)`).Error
+		if err := tx.Exec(`CREATE INDEX idx_transactions_fraud_status ON transactions(fraud_status)`).Error; err != nil {
+			return err
+		}
+
+		if err := tx.Exec(`
+			CREATE INDEX IF NOT EXISTS idx_transactions_user_created_at_desc
+			ON transactions(user_id, created_at DESC)
+		`).Error; err != nil {
+			return err
+		}
+
+		return tx.Exec(`
+			CREATE INDEX IF NOT EXISTS idx_transactions_user_non_fraud_created_at_desc
+			ON transactions(user_id, created_at DESC)
+			INCLUDE (amount)
+			WHERE fraud_status = FALSE
+		`).Error
 	},
 	Down: func(tx *gorm.DB) error {
+		if err := tx.Exec(`DROP INDEX IF EXISTS idx_transactions_user_non_fraud_created_at_desc`).Error; err != nil {
+			return err
+		}
+		if err := tx.Exec(`DROP INDEX IF EXISTS idx_transactions_user_created_at_desc`).Error; err != nil {
+			return err
+		}
+
 		if err := tx.Exec(`DROP TABLE IF EXISTS transactions`).Error; err != nil {
 			return err
 		}

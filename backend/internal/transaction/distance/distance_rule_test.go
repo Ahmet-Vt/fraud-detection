@@ -24,11 +24,10 @@ func TestDistanceRuleBursaToIstanbulNotReachableInTwoMinutes(t *testing.T) {
 		t.Fatalf("expected Bursa-Istanbul distance to be in a plausible range, got %.2f km", kmDistance)
 	}
 
-	lastTransactionTime := time.Now().Add(-2 * time.Minute)
-	t.Logf("last transaction time: %s", lastTransactionTime.Format(time.RFC3339))
-	t.Logf("elapsed since last transaction: %.2f minutes", time.Since(lastTransactionTime).Minutes())
+	elapsed := 2 * time.Minute
+	t.Logf("elapsed between transactions: %.2f minutes", elapsed.Minutes())
 
-	reachable := IsReachableWithPlane(kmDistance, lastTransactionTime)
+	reachable := IsReachableWithPlane(kmDistance, elapsed)
 	t.Logf("reachable by plane: %t", reachable)
 	if reachable {
 		t.Fatalf("expected Bursa-Istanbul trip to be unreachable in 2 minutes, distance was %.2f km", kmDistance)
@@ -54,11 +53,10 @@ func TestDistanceRuleBursaToIstanbulReachableInTwentyMinutes(t *testing.T) {
 		t.Fatalf("expected Bursa-Istanbul distance to be in a plausible range, got %.2f km", kmDistance)
 	}
 
-	lastTransactionTime := time.Now().Add(-20 * time.Minute)
-	t.Logf("last transaction time: %s", lastTransactionTime.Format(time.RFC3339))
-	t.Logf("elapsed since last transaction: %.2f minutes", time.Since(lastTransactionTime).Minutes())
+	elapsed := 20 * time.Minute
+	t.Logf("elapsed between transactions: %.2f minutes", elapsed.Minutes())
 
-	reachable := IsReachableWithPlane(kmDistance, lastTransactionTime)
+	reachable := IsReachableWithPlane(kmDistance, elapsed)
 	t.Logf("reachable by plane: %t", reachable)
 	if !reachable {
 		t.Fatalf("expected Bursa-Istanbul trip to be reachable in 20 minutes, distance was %.2f km", kmDistance)

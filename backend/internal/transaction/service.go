@@ -126,6 +126,15 @@ func (s *Service) GetTransactionsByUserID(userID uuid.UUID) ([]*domain.Transacti
 	return transactions, nil
 }
 
+func (s *Service) GetPreviousTransactionByUserID(userID uuid.UUID, before time.Time) (*domain.Transaction, bool, error) {
+	transaction, found, err := s.repository.FindPreviousByUserID(userID, before)
+	if err != nil {
+		return nil, false, fmt.Errorf("get previous transaction by user id: %w", err)
+	}
+
+	return transaction, found, nil
+}
+
 func (s *Service) GetTripleAmountAverageLast24HoursByUserID(userID uuid.UUID, excludeTxID *uuid.UUID) (int64, error) {
 	tripleAverage, err := s.repository.GetTripleAmountAverageLast24HoursByUserID(userID, excludeTxID)
 	if err != nil {

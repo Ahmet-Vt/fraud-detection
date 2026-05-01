@@ -100,7 +100,7 @@ func loadConfig() AppConfig {
 			User:          requireEnv("RABBITMQ_USER"),
 			Password:      requireEnv("RABBITMQ_PASSWORD"),
 			ConsumerCount: envIntOrDefault("RABBITMQ_CONSUMER_COUNT", 4),
-			PrefetchCount: envIntOrDefault("RABBITMQ_PREFETCH_COUNT", 20),
+			PrefetchCount: envIntOrDefault("RABBITMQ_PREFETCH_COUNT", 10),
 		},
 		Redis: RedisConfig{
 			Host: requireEnv("REDIS_HOST"),

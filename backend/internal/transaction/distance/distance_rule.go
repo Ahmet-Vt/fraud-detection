@@ -26,11 +26,11 @@ func HaversineDistance(lat1, lon1, lat2, lon2 float64) float64 {
 	return kmDistance
 }
 
-func IsReachableWithPlane(kmDistance float64, lastTransactionTime time.Time) bool {
+func IsReachableWithPlane(kmDistance float64, elapsed time.Duration) bool {
 	basePlaneSpeedKmAnHour := 800.0
 	timeToReach := kmDistance / basePlaneSpeedKmAnHour
 
-	timeSinceLastTransaction := time.Since(lastTransactionTime).Hours()
+	timeSinceLastTransaction := elapsed.Hours()
 
 	if timeSinceLastTransaction >= timeToReach {
 		return true
