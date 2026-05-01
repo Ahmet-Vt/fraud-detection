@@ -70,7 +70,7 @@ const docTemplate = `{
                 }
             },
             "post": {
-                "description": "Creates a new transaction for a user.",
+                "description": "Creates a new transaction for a user. HTTP 400 is INVALID_REQUEST_BODY for malformed JSON or binding errors, or USER_NOT_EXISTS when user_id is unknown.",
                 "consumes": [
                     "application/json"
                 ],
@@ -621,6 +621,11 @@ const docTemplate = `{
                     "type": "string",
                     "x-order": "3",
                     "example": "Istanbul"
+                },
+                "fraud_status": {
+                    "type": "boolean",
+                    "x-order": "4",
+                    "example": false
                 }
             }
         },

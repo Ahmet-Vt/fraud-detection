@@ -167,6 +167,10 @@ definitions:
         example: 5000
         type: integer
         x-order: "2"
+      fraud_status:
+        example: false
+        type: boolean
+        x-order: "4"
       id:
         example: 1dc90ef0-76a0-4cb2-891e-5193c60aa82f
         format: uuid
@@ -291,7 +295,8 @@ paths:
     post:
       consumes:
       - application/json
-      description: Creates a new transaction for a user.
+      description: Creates a new transaction for a user. HTTP 400 is INVALID_REQUEST_BODY
+        for malformed JSON or binding errors, or USER_NOT_EXISTS when user_id is unknown.
       parameters:
       - description: Create transaction payload
         in: body
