@@ -17,7 +17,6 @@ type TransactionEvaluatedEvent struct {
 	UserSurname       string    `json:"user_surname"`
 	Amount            int64     `json:"amount"`
 	Location          string    `json:"location"`
-	TransactionStatus string    `json:"transaction_status"`
 	FraudStatus       bool      `json:"fraud_status"`
 	CreatedAt         time.Time `json:"created_at"`
 	EvaluatedAt       time.Time `json:"evaluated_at"`

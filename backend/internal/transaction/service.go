@@ -215,7 +215,6 @@ func (s *Service) PublishTransactionEvaluated(ctx context.Context, transaction *
 		UserSurname:       transaction.User.Surname,
 		Amount:            transaction.Amount,
 		Location:          transaction.Location,
-		TransactionStatus: string(transaction.TransactionStatus),
 		FraudStatus:       transaction.FraudStatus,
 		CreatedAt:         transaction.CreatedAt,
 		EvaluatedAt:       evaluatedAt,
