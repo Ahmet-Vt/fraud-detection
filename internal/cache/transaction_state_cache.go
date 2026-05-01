@@ -160,27 +160,6 @@ func (c *TransactionStateCache) GetRequestCountByUserID(ctx context.Context, use
 	return int(countCmd.Val()), nil
 }
 
-func (c *TransactionStateCache) IsVelocityHotByUserID(ctx context.Context, userID uuid.UUID) (bool, error) {
-	if c == nil || c.client == nil {
-		return false, fmt.Errorf("transaction state cache is nil")
-	}
-
-	exists, err := c.client.Exists(ctx, velocityHotCacheKey(userID)).Result()
-	if err != nil {
-		return false, err
-	}
-
-	return exists > 0, nil
-}
-
-func (c *TransactionStateCache) MarkVelocityHotByUserID(ctx context.Context, userID uuid.UUID) error {
-	if c == nil || c.client == nil {
-		return fmt.Errorf("transaction state cache is nil")
-	}
-
-	return c.client.SetNX(ctx, velocityHotCacheKey(userID), "1", RequestCountTTL).Err()
-}
-
 func lastLocationCacheKey(userID uuid.UUID) string {
 	return fmt.Sprintf("last_location:%s", userID)
 }
@@ -195,8 +174,4 @@ func lastTransactionCreatedAtCacheKey(userID uuid.UUID) string {
 
 func last24HoursAverageSpendCacheKey(userID uuid.UUID) string {
 	return fmt.Sprintf("last_24h_average_spend:%s", userID)
-}
-
-func velocityHotCacheKey(userID uuid.UUID) string {
-	return fmt.Sprintf("velocity_hot:%s", userID)
 }
