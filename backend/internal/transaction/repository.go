@@ -101,7 +101,7 @@ func (r *Repository) UpdateStatus(transactionID uuid.UUID, status domain.Status)
 
 func (r *Repository) FindByID(id uuid.UUID) (*domain.Transaction, error) {
 	var transaction domain.Transaction
-	if err := r.db.Preload("FraudRules").First(&transaction, id).Error; err != nil {
+	if err := r.db.Preload("FraudRules").Preload("User").First(&transaction, id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, fmt.Errorf("find transaction by id: %w", errors.Join(ErrTransactionNotFound, err))
 		}

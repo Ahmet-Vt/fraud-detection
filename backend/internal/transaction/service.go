@@ -16,6 +16,10 @@ type transactionCreatedPublisher interface {
 	PublishTransactionCreated(ctx context.Context, evt TransactionCreatedEvent) error
 }
 
+type transactionEvaluatedPublisher interface {
+	PublishTransactionEvaluated(ctx context.Context, evt TransactionEvaluatedEvent) error
+}
+
 type transactionStateCache interface {
 	GetLastLocationByUserID(ctx context.Context, userID uuid.UUID) (string, bool, error)
 	SetLastLocationByUserID(ctx context.Context, userID uuid.UUID, location string) error
@@ -24,18 +28,25 @@ type transactionStateCache interface {
 }
 
 type Service struct {
-	repository RepositoryInterface
-	publisher  transactionCreatedPublisher
-	cache      transactionStateCache
+	repository         RepositoryInterface
+	createdPublisher   transactionCreatedPublisher
+	evaluatedPublisher transactionEvaluatedPublisher
+	cache              transactionStateCache
 }
 
 const requestCountFraudThreshold = 5
 
-func NewService(repository RepositoryInterface, publisher transactionCreatedPublisher, cache transactionStateCache) *Service {
+func NewService(
+	repository RepositoryInterface,
+	createdPublisher transactionCreatedPublisher,
+	evaluatedPublisher transactionEvaluatedPublisher,
+	cache transactionStateCache,
+) *Service {
 	return &Service{
-		repository: repository,
-		publisher:  publisher,
-		cache:      cache,
+		repository:         repository,
+		createdPublisher:   createdPublisher,
+		evaluatedPublisher: evaluatedPublisher,
+		cache:              cache,
 	}
 }
 
@@ -67,7 +78,7 @@ func (s *Service) CreateTransaction(ctx context.Context, transaction *domain.Tra
 		}
 	}
 
-	if s.publisher != nil {
+	if s.createdPublisher != nil {
 		evt := TransactionCreatedEvent{
 			TransactionID: transaction.ID.String(),
 			UserID:        transaction.UserID.String(),
@@ -75,7 +86,7 @@ func (s *Service) CreateTransaction(ctx context.Context, transaction *domain.Tra
 			Location:      transaction.Location,
 			CreatedAt:     transaction.CreatedAt,
 		}
-		if err := s.publisher.PublishTransactionCreated(ctx, evt); err != nil {
+		if err := s.createdPublisher.PublishTransactionCreated(ctx, evt); err != nil {
 			log.Printf("publish transaction created event: %v", err)
 		}
 	}
@@ -184,6 +195,34 @@ func (s *Service) SetLastLocationByUserID(ctx context.Context, userID uuid.UUID,
 func (s *Service) DeleteTransaction(id uuid.UUID) error {
 	if err := s.repository.Delete(id); err != nil {
 		return fmt.Errorf("delete transaction: %w", err)
+	}
+
+	return nil
+}
+
+func (s *Service) PublishTransactionEvaluated(ctx context.Context, transaction *domain.Transaction, evaluatedAt time.Time) error {
+	if transaction == nil {
+		return fmt.Errorf("publish transaction evaluated: %w", errors.New("nil transaction"))
+	}
+	if s.evaluatedPublisher == nil {
+		return nil
+	}
+
+	evt := TransactionEvaluatedEvent{
+		TransactionID:     transaction.ID.String(),
+		UserID:            transaction.UserID.String(),
+		UserName:          transaction.User.Name,
+		UserSurname:       transaction.User.Surname,
+		Amount:            transaction.Amount,
+		Location:          transaction.Location,
+		TransactionStatus: string(transaction.TransactionStatus),
+		FraudStatus:       transaction.FraudStatus,
+		CreatedAt:         transaction.CreatedAt,
+		EvaluatedAt:       evaluatedAt,
+	}
+
+	if err := s.evaluatedPublisher.PublishTransactionEvaluated(ctx, evt); err != nil {
+		return fmt.Errorf("publish transaction evaluated: %w", err)
 	}
 
 	return nil

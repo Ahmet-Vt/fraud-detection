@@ -13,6 +13,7 @@ import (
 	"fraud-detection/internal/database"
 	"fraud-detection/internal/fraud"
 	"fraud-detection/internal/messaging/rabbitmq"
+	"fraud-detection/internal/stream"
 	"fraud-detection/internal/transaction"
 	"fraud-detection/internal/user"
 	"fraud-detection/internal/worker"
@@ -63,7 +64,9 @@ func main() {
 
 	transactionRepository := transaction.NewRepository(db)
 	transactionStateCache := cache.NewTransactionStateCache(redisClient)
-	transactionService := transaction.NewService(transactionRepository, publisher, transactionStateCache)
+	sseHub := stream.NewSSEHub()
+	streamHandler := stream.NewHandler(sseHub)
+	transactionService := transaction.NewService(transactionRepository, publisher, sseHub, transactionStateCache)
 	transactionHandler := transaction.NewHandler(transactionService)
 	fraudService := fraud.NewService(transactionService, transactionStateCache)
 	workerPool := worker.NewFraudWorker(fraudService, transactionService)
@@ -75,6 +78,7 @@ func main() {
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 	userHandler.RegisterRoutes(router)
 	transactionHandler.RegisterRoutes(router)
+	streamHandler.RegisterRoutes(router)
 
 	if err := router.Run(); err != nil {
 		log.Fatal(err)

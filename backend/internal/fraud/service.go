@@ -24,6 +24,8 @@ type transactionReaderWriter interface {
 	GetPreviousTransactionByUserID(userID uuid.UUID, before time.Time) (*domain.Transaction, bool, error)
 	GetTripleAmountAverageLast24HoursByUserID(userID uuid.UUID, excludeTxID *uuid.UUID) (int64, error)
 	UpdateFraudRules(transactionID uuid.UUID, rules []domain.TransactionFraudRule) error
+	UpdateTransactionStatus(transactionID uuid.UUID, status domain.Status) error
+	PublishTransactionEvaluated(ctx context.Context, transaction *domain.Transaction, evaluatedAt time.Time) error
 }
 
 type transactionStateCache interface {
@@ -106,6 +108,18 @@ func (s *Service) EvaluateTransaction(ctx context.Context, transactionID uuid.UU
 
 	if err := s.transactionService.UpdateFraudRules(transactionID, rules); err != nil {
 		return nil, fmt.Errorf("evaluate transaction: %w", errors.Join(ErrUpdateFraudRulesFailed, err))
+	}
+
+	currentTransaction.FraudRules = rules
+	currentTransaction.RefreshFraudStatus()
+
+	if err := s.transactionService.UpdateTransactionStatus(transactionID, domain.TransactionStatusCompleted); err != nil {
+		return nil, fmt.Errorf("evaluate transaction: %w", errors.Join(ErrUpdateFraudRulesFailed, err))
+	}
+	currentTransaction.TransactionStatus = domain.TransactionStatusCompleted
+
+	if err := s.transactionService.PublishTransactionEvaluated(ctx, currentTransaction, time.Now()); err != nil {
+		return nil, fmt.Errorf("evaluate transaction: %w", errors.Join(ErrFraudRuleEvaluation, err))
 	}
 
 	return rules, nil
