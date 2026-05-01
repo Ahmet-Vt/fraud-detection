@@ -10,6 +10,14 @@ export default defineConfig({
         target: 'http://localhost:8080',
         changeOrigin: true,
       },
+      '/users': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
+      '/transactions': {
+        target: 'http://localhost:8080',
+        changeOrigin: true,
+      },
     },
   },
 })
