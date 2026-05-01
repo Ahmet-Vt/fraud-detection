@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 export type LiveTransaction = {
   id: string
@@ -7,12 +7,40 @@ export type LiveTransaction = {
   userSurname: string
   amount: number
   location: string
-  transactionStatus: string
   fraudstatus: boolean
   createdat: string
 }
 
 type ConnectionMode = 'idle' | 'sse' | 'disconnected'
+
+export type FraudRatePoint = {
+  minuteLabel: string
+  anomalyRate: number | null
+  requestCount: number
+  fraudCount: number
+}
+
+const chartBucketMs = 15000
+const chartWindowPoints = 240
+
+function formatBucketLabel(date: Date): string {
+  return date.toLocaleTimeString([], {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  })
+}
+
+function createInitialFraudRateSeries(now = Date.now()): FraudRatePoint[] {
+  const start = now
+  return Array.from({ length: chartWindowPoints }, (_, index) => ({
+    minuteLabel: formatBucketLabel(new Date(start + index * chartBucketMs)),
+    anomalyRate: null,
+    requestCount: 0,
+    fraudCount: 0,
+  }))
+}
 
 type UseLiveTransactionsOptions = {
   sseUrl?: string
@@ -26,7 +54,6 @@ type BackendTransaction = {
   user_surname?: string
   amount: number
   location: string
-  transaction_status: string
   fraud_status: boolean
   created_at: string
 }
@@ -38,7 +65,6 @@ type BackendEvaluatedTransaction = {
   user_surname: string
   amount: number
   location: string
-  transaction_status: string
   fraud_status: boolean
   created_at: string
 }
@@ -51,7 +77,6 @@ function mapBackendTransaction(tx: BackendTransaction): LiveTransaction {
     userSurname: tx.user_surname ?? '',
     amount: tx.amount,
     location: tx.location,
-    transactionStatus: tx.transaction_status,
     fraudstatus: tx.fraud_status,
     createdat: tx.created_at,
   }
@@ -65,7 +90,6 @@ function mapBackendEvaluatedTransaction(tx: BackendEvaluatedTransaction): LiveTr
     userSurname: tx.user_surname,
     amount: tx.amount,
     location: tx.location,
-    transactionStatus: tx.transaction_status,
     fraudstatus: tx.fraud_status,
     createdat: tx.created_at,
   }
@@ -81,7 +105,6 @@ function isBackendTransaction(value: unknown): value is BackendTransaction {
     (typeof v.user_surname === 'string' || typeof v.user_surname === 'undefined') &&
     typeof v.amount === 'number' &&
     typeof v.location === 'string' &&
-    typeof v.transaction_status === 'string' &&
     typeof v.fraud_status === 'boolean' &&
     typeof v.created_at === 'string'
   )
@@ -97,7 +120,6 @@ function isBackendEvaluatedTransaction(value: unknown): value is BackendEvaluate
     typeof v.user_surname === 'string' &&
     typeof v.amount === 'number' &&
     typeof v.location === 'string' &&
-    typeof v.transaction_status === 'string' &&
     typeof v.fraud_status === 'boolean' &&
     typeof v.created_at === 'string'
   )
@@ -113,7 +135,6 @@ function isLiveTransaction(value: unknown): value is LiveTransaction {
     typeof v.userSurname === 'string' &&
     typeof v.amount === 'number' &&
     typeof v.location === 'string' &&
-    typeof v.transactionStatus === 'string' &&
     typeof v.fraudstatus === 'boolean' &&
     typeof v.createdat === 'string'
   )
@@ -162,9 +183,52 @@ export function useLiveTransactions({
   maxItems = 100,
 }: UseLiveTransactionsOptions) {
   const [transactions, setTransactions] = useState<LiveTransaction[]>([])
+  const [fraudRateSeries, setFraudRateSeries] = useState<FraudRatePoint[]>(() =>
+    createInitialFraudRateSeries(),
+  )
   const [connectionMode, setConnectionMode] = useState<ConnectionMode>('idle')
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const minuteBufferRef = useRef<LiveTransaction[]>([])
+  const nextChartWriteIndexRef = useRef(0)
+
+  useEffect(() => {
+    const flushMinuteBuffer = () => {
+      const batch = minuteBufferRef.current
+      minuteBufferRef.current = []
+
+      const total = batch.length
+      const suspiciousCount = batch.filter((tx) => tx.fraudstatus).length
+      const anomalyRate = total === 0 ? 0 : (suspiciousCount / total) * 100
+      const point: FraudRatePoint = {
+        minuteLabel: formatBucketLabel(new Date()),
+        anomalyRate: Number(anomalyRate.toFixed(2)),
+        requestCount: total,
+        fraudCount: suspiciousCount,
+      }
+
+      setFraudRateSeries((prev) => {
+        // First hour: fill preallocated timeline from left to right.
+        if (nextChartWriteIndexRef.current < chartWindowPoints) {
+          const next = [...prev]
+          next[nextChartWriteIndexRef.current] = {
+            ...next[nextChartWriteIndexRef.current],
+            ...point,
+          }
+          nextChartWriteIndexRef.current += 1
+          return next
+        }
+
+        // After first hour: keep a sliding 1-hour window.
+        const shifted = prev.slice(1)
+        shifted.push(point)
+        return shifted
+      })
+    }
+
+    const intervalId = window.setInterval(flushMinuteBuffer, chartBucketMs)
+    return () => window.clearInterval(intervalId)
+  }, [])
 
   useEffect(() => {
     let source: EventSource | null = null
@@ -184,6 +248,7 @@ export function useLiveTransactions({
               : parsed
           const normalized = normalizePayload(payload)
           if (normalized.length > 0) {
+            minuteBufferRef.current.push(...normalized)
             setTransactions((prev) => prependUnique(normalized, prev, maxItems))
           }
         }
@@ -251,8 +316,21 @@ export function useLiveTransactions({
     [transactions],
   )
 
+  const chartTotals = useMemo(() => {
+    return fraudRateSeries.reduce(
+      (acc, point) => {
+        acc.requestCount += point.requestCount
+        acc.fraudCount += point.fraudCount
+        return acc
+      },
+      { requestCount: 0, fraudCount: 0 },
+    )
+  }, [fraudRateSeries])
+
   return {
     transactions: sortedTransactions,
+    fraudRateSeries,
+    chartTotals,
     connectionMode,
     isLoading,
     error,

@@ -8,16 +8,21 @@ function App() {
   const env = import.meta.env as Record<string, string | undefined>
   const sseUrl = env.VITE_SSE_URL ?? '/stream/transactions'
 
-  const { transactions, connectionMode, isLoading, error } = useLiveTransactions({
-    sseUrl,
-    maxItems: 100,
-  })
+  const { transactions, fraudRateSeries, chartTotals, connectionMode, isLoading, error } =
+    useLiveTransactions({
+      sseUrl,
+      maxItems: 100,
+    })
 
   return (
     <main className={`min-h-screen bg-base-200 ${ui.pagePadding}`}>
       <div className={`mx-auto ${ui.containerWidth} ${ui.stackGap}`}>
         <h1 className={`${ui.titleText} font-semibold`}>Fraud Dashboard</h1>
-        <Chart />
+        <Chart
+          data={fraudRateSeries}
+          requestCount={chartTotals.requestCount}
+          fraudCount={chartTotals.fraudCount}
+        />
         <DashboardTable
           rows={transactions}
           connectionMode={connectionMode}
