@@ -8,25 +8,12 @@ Usage: auto-test.sh [options]
 Options:
   --duration=<seconds>                 Script runtime in seconds (default: 30)
   --rate=<requests_per_second>         Transactions to send per second (default: 5)
-  --anomaly-chance=<percentage>        Anomaly request probability [0-100] (default: 30)
-  --base-url=<url>                     API base URL (default: env BASE_URL or http://localhost:8080)
-  --user-id=<uuid>                     Existing user id (creates one if omitted)
-  --home-city=<city>                   Normal traffic city from city.go (default: Istanbul)
-  --far-cities=<city,city>             Far city pool from city.go (default: Van,Hakkari,Artvin,Kars,Edirne)
-  --normal-amount-min=<amount>         Normal minimum amount (default: 300)
-  --normal-amount-max=<amount>         Normal maximum amount (default: 900)
-  --anomaly-amount=<amount>            Amount used by amount anomalies (default: 45000)
-  --burst-size=<count>                 Requests sent by velocity scenarios (default: 6)
-  --settle-seconds=<seconds>           Wait before reading final statuses (default: 2)
-  --amount-weight=<weight>             Weight inside anomaly scenarios (default: 35)
-  --velocity-weight=<weight>           Weight inside anomaly scenarios (default: 25)
-  --location-weight=<weight>           Weight inside anomaly scenarios (default: 25)
-  --combined-weight=<weight>           Weight inside anomaly scenarios (default: 15)
+  --anomaly=<percentage>               Anomaly request probability [0-100] (default: 30)
   -h, --help                           Show help
 
 Examples:
-  ./scripts/auto-test.sh --duration=20 --rate=5 --anomaly-chance=50 --anomaly-amount=45000
-  ./scripts/auto-test.sh --user-id=<uuid> --home-city=Istanbul --far-cities=Van,Hakkari,Kars
+  ./scripts/auto-test.sh --duration=20 --rate=5 --anomaly=50
+  BASE_URL=http://localhost:8080 ./scripts/auto-test.sh --anomaly=100
 EOF
 }
 
@@ -34,7 +21,6 @@ DURATION=30
 RATE=5
 ANOMALY_CHANCE=30
 BASE_URL="${BASE_URL:-http://localhost:8080}"
-USER_ID="${USER_ID:-}"
 HOME_CITY="Istanbul"
 FAR_CITIES_CSV="Van,Hakkari,Artvin,Kars,Edirne"
 NORMAL_AMOUNT_MIN=300
@@ -42,10 +28,6 @@ NORMAL_AMOUNT_MAX=900
 ANOMALY_AMOUNT=45000
 BURST_SIZE=6
 SETTLE_SECONDS=2
-AMOUNT_WEIGHT=35
-VELOCITY_WEIGHT=25
-LOCATION_WEIGHT=25
-COMBINED_WEIGHT=15
 
 for arg in "$@"; do
 	case "$arg" in
@@ -55,47 +37,11 @@ for arg in "$@"; do
 	--rate=*)
 		RATE="${arg#*=}"
 		;;
-	--anomaly-chance=*)
+	--anomaly=*)
 		ANOMALY_CHANCE="${arg#*=}"
 		;;
-	--base-url=*)
-		BASE_URL="${arg#*=}"
-		;;
-	--user-id=*)
-		USER_ID="${arg#*=}"
-		;;
-	--home-city=*)
-		HOME_CITY="${arg#*=}"
-		;;
-	--far-cities=*)
-		FAR_CITIES_CSV="${arg#*=}"
-		;;
-	--normal-amount-min=*)
-		NORMAL_AMOUNT_MIN="${arg#*=}"
-		;;
-	--normal-amount-max=*)
-		NORMAL_AMOUNT_MAX="${arg#*=}"
-		;;
-	--anomaly-amount=*)
-		ANOMALY_AMOUNT="${arg#*=}"
-		;;
-	--burst-size=*)
-		BURST_SIZE="${arg#*=}"
-		;;
-	--settle-seconds=*)
-		SETTLE_SECONDS="${arg#*=}"
-		;;
-	--amount-weight=*)
-		AMOUNT_WEIGHT="${arg#*=}"
-		;;
-	--velocity-weight=*)
-		VELOCITY_WEIGHT="${arg#*=}"
-		;;
-	--location-weight=*)
-		LOCATION_WEIGHT="${arg#*=}"
-		;;
-	--combined-weight=*)
-		COMBINED_WEIGHT="${arg#*=}"
+	--anomaly-chance=*)
+		ANOMALY_CHANCE="${arg#*=}"
 		;;
 	-h | --help)
 		usage
@@ -138,25 +84,10 @@ require_percentage() {
 
 require_positive_int "duration" "$DURATION"
 require_positive_int "rate" "$RATE"
-require_percentage "anomaly-chance" "$ANOMALY_CHANCE"
-require_positive_int "normal-amount-min" "$NORMAL_AMOUNT_MIN"
-require_positive_int "normal-amount-max" "$NORMAL_AMOUNT_MAX"
-require_positive_int "anomaly-amount" "$ANOMALY_AMOUNT"
-require_positive_int "burst-size" "$BURST_SIZE"
-require_non_negative_int "settle-seconds" "$SETTLE_SECONDS"
-require_non_negative_int "amount-weight" "$AMOUNT_WEIGHT"
-require_non_negative_int "velocity-weight" "$VELOCITY_WEIGHT"
-require_non_negative_int "location-weight" "$LOCATION_WEIGHT"
-require_non_negative_int "combined-weight" "$COMBINED_WEIGHT"
+require_percentage "anomaly" "$ANOMALY_CHANCE"
 
 if ((NORMAL_AMOUNT_MIN > NORMAL_AMOUNT_MAX)); then
 	echo "normal-amount-min cannot be greater than normal-amount-max" >&2
-	exit 1
-fi
-
-TOTAL_ANOMALY_WEIGHT=$((AMOUNT_WEIGHT + VELOCITY_WEIGHT + LOCATION_WEIGHT + COMBINED_WEIGHT))
-if ((TOTAL_ANOMALY_WEIGHT <= 0)); then
-	echo "at least one anomaly scenario weight must be greater than zero" >&2
 	exit 1
 fi
 
@@ -223,27 +154,12 @@ now_ms() {
 }
 
 pick_anomaly_scenario() {
-	local roll
-	roll=$((RANDOM % TOTAL_ANOMALY_WEIGHT))
-
-	if ((roll < AMOUNT_WEIGHT)); then
-		printf 'amount\n'
-		return
-	fi
-	roll=$((roll - AMOUNT_WEIGHT))
-
-	if ((roll < VELOCITY_WEIGHT)); then
-		printf 'velocity\n'
-		return
-	fi
-	roll=$((roll - VELOCITY_WEIGHT))
-
-	if ((roll < LOCATION_WEIGHT)); then
-		printf 'location\n'
-		return
-	fi
-
-	printf 'combined\n'
+	case $((RANDOM % 4)) in
+	0) printf 'amount\n' ;;
+	1) printf 'velocity\n' ;;
+	2) printf 'location\n' ;;
+	*) printf 'combined\n' ;;
+	esac
 }
 
 send_transaction() {
@@ -356,9 +272,7 @@ print_final_statuses() {
 	done <"$RESULTS_FILE"
 }
 
-if [[ -z "$USER_ID" ]]; then
-	USER_ID="$(create_user)"
-fi
+USER_ID="$(create_user)"
 
 TOTAL_REQUESTS=$((DURATION * RATE))
 
