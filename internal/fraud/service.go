@@ -23,7 +23,7 @@ const (
 type transactionReaderWriter interface {
 	GetTransactionByID(id uuid.UUID) (*domain.Transaction, error)
 	GetTransactionsByUserID(userID uuid.UUID) ([]*domain.Transaction, error)
-	GetTripleAmountAverageLast24HoursByUserID(userID uuid.UUID) (int64, error)
+	GetTripleAmountAverageLast24HoursByUserID(userID uuid.UUID, excludeTxID *uuid.UUID) (int64, error)
 	UpdateFraudRules(transactionID uuid.UUID, rules []domain.TransactionFraudRule) error
 }
 
@@ -33,8 +33,6 @@ type transactionStateCache interface {
 	GetRequestCountByUserID(ctx context.Context, userID uuid.UUID, referenceTime time.Time) (int, error)
 	GetLast24HoursAverageSpendByUserID(ctx context.Context, userID uuid.UUID) (int64, bool, error)
 	SetLast24HoursAverageSpendByUserID(ctx context.Context, userID uuid.UUID, average int64) error
-	IsVelocityHotByUserID(ctx context.Context, userID uuid.UUID) (bool, error)
-	MarkVelocityHotByUserID(ctx context.Context, userID uuid.UUID) error
 }
 
 type Service struct {
@@ -43,12 +41,12 @@ type Service struct {
 }
 
 type cachedRuleInputs struct {
-	lastLocation             string
-	lastCreatedAt            time.Time
-	hasLastLocation          bool
-	hasLastCreatedAt         bool
-	requestCount             int
-	hasRequestCount          bool
+	lastLocation     string
+	lastCreatedAt    time.Time
+	hasLastLocation  bool
+	hasLastCreatedAt bool
+	requestCount     int
+	hasRequestCount  bool
 }
 
 func NewService(transactionService transactionReaderWriter, cache transactionStateCache) *Service {
@@ -201,7 +199,10 @@ func (s *Service) evaluateAmountRule(ctx context.Context, currentTransaction *do
 	}
 
 	if !cacheHit {
-		tripleAverage, err = s.transactionService.GetTripleAmountAverageLast24HoursByUserID(currentTransaction.UserID)
+		tripleAverage, err = s.transactionService.GetTripleAmountAverageLast24HoursByUserID(
+			currentTransaction.UserID,
+			&currentTransaction.ID,
+		)
 		if err != nil {
 			return false, err
 		}
@@ -212,8 +213,8 @@ func (s *Service) evaluateAmountRule(ctx context.Context, currentTransaction *do
 
 	matched := tripleAverage != 0 && currentTransaction.Amount > tripleAverage
 
-	if s.cache != nil {
-		latestAverage, err := s.transactionService.GetTripleAmountAverageLast24HoursByUserID(currentTransaction.UserID)
+	if s.cache != nil && !matched {
+		latestAverage, err := s.transactionService.GetTripleAmountAverageLast24HoursByUserID(currentTransaction.UserID, nil)
 		if err != nil {
 			return false, err
 		}
@@ -300,9 +301,6 @@ func (s *Service) evaluateVelocityRule(
 	if !cacheInputs.hasRequestCount {
 		return false, nil
 	}
-	if err := ctx.Err(); err != nil {
-		return false, err
-	}
 
 	return cacheInputs.requestCount > requestCountFraudThreshold, nil
 }
@@ -331,16 +329,6 @@ func (s *Service) loadCachedRuleInputs(ctx context.Context, currentTransaction *
 		result.hasLastCreatedAt = true
 	}
 
-	hot, err := s.cache.IsVelocityHotByUserID(ctx, currentTransaction.UserID)
-	if err != nil {
-		return result, errors.Join(ErrRequestCountCacheFailed, err)
-	}
-	if hot {
-		result.requestCount = requestCountFraudThreshold + 1
-		result.hasRequestCount = true
-		return result, nil
-	}
-
 	requestCount, err := s.cache.GetRequestCountByUserID(
 		ctx,
 		currentTransaction.UserID,
@@ -351,11 +339,6 @@ func (s *Service) loadCachedRuleInputs(ctx context.Context, currentTransaction *
 	}
 	result.requestCount = requestCount
 	result.hasRequestCount = true
-	if requestCount > requestCountFraudThreshold {
-		if err := s.cache.MarkVelocityHotByUserID(ctx, currentTransaction.UserID); err != nil {
-			return result, errors.Join(ErrRequestCountCacheFailed, err)
-		}
-	}
 
 	return result, nil
 }
