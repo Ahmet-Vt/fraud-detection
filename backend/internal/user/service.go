@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"fraud-detection/internal/domain"
+
 	"github.com/google/uuid"
 )
 

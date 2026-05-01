@@ -104,4 +104,7 @@ func TestGetAllUsersSuccess(t *testing.T) {
 	if len(users) != len(expected) {
 		t.Fatalf("expected %d users, got %d", len(expected), len(users))
 	}
+	if users[0].Name != expected[0].Name || users[1].Name != expected[1].Name {
+		t.Fatalf("expected service to return repository order unchanged")
+	}
 }
