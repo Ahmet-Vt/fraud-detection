@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"fraud-detection/internal/domain"
+
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgconn"
 	"gorm.io/gorm"
@@ -37,7 +38,7 @@ func (r *Repository) Create(user *domain.User) error {
 
 func (r *Repository) FindByID(id uuid.UUID) (*domain.User, error) {
 	var user domain.User
-	if err := r.db.First(&user, id).Error; err != nil {
+	if err := r.db.First(&user, "id = ?", id).Error; err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
 			return nil, fmt.Errorf("find user by id: %w", errors.Join(ErrUserNotFound, err))
 		}
