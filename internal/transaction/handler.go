@@ -7,6 +7,7 @@ import (
 
 	"fraud-detection/internal/domain"
 	"fraud-detection/internal/secureerr"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 )

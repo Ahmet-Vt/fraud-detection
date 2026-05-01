@@ -16,7 +16,7 @@ type RepositoryInterface interface {
 	FindByID(id uuid.UUID) (*domain.Transaction, error)
 	FindAll() ([]*domain.Transaction, error)
 	FindByUserID(userID uuid.UUID) ([]*domain.Transaction, error)
-	GetTripleAmountAverageLast24HoursByUserID(userID uuid.UUID) (int64, error)
+	GetTripleAmountAverageLast24HoursByUserID(userID uuid.UUID, excludeTxID *uuid.UUID) (int64, error)
 	Delete(id uuid.UUID) error
 	GetLastLocationByUserID(userID uuid.UUID) (string, error)
 }
@@ -106,13 +106,17 @@ func (r *Repository) FindByUserID(userID uuid.UUID) ([]*domain.Transaction, erro
 	return transactions, nil
 }
 
-func (r *Repository) GetTripleAmountAverageLast24HoursByUserID(userID uuid.UUID) (int64, error) {
+func (r *Repository) GetTripleAmountAverageLast24HoursByUserID(userID uuid.UUID, excludeTxID *uuid.UUID) (int64, error) {
 	var tripleAmountAverage int64
 
-	if err := r.db.Model(&domain.Transaction{}).
+	query := r.db.Model(&domain.Transaction{}).
 		Select("COALESCE((AVG(amount) * 3)::bigint, 0)").
-		Where("user_id = ? AND created_at >= NOW() - INTERVAL '24 hours'", userID).
-		Scan(&tripleAmountAverage).Error; err != nil {
+		Where("user_id = ? AND created_at >= NOW() - INTERVAL '24 hours' AND fraud_status = ?", userID, false)
+	if excludeTxID != nil {
+		query = query.Where("id <> ?", *excludeTxID)
+	}
+
+	if err := query.Scan(&tripleAmountAverage).Error; err != nil {
 		return 0, fmt.Errorf("get triple amount average last 24 hours by user id: %w", err)
 	}
 
