@@ -18,6 +18,12 @@ type RepositoryInterface interface {
 	FindByID(id uuid.UUID) (*domain.Transaction, error)
 	FindAll() ([]*domain.Transaction, error)
 	FindByUserID(userID uuid.UUID) ([]*domain.Transaction, error)
+	GetUserTransactionSummary(
+		userID uuid.UUID,
+		from time.Time,
+		to time.Time,
+		bucket string,
+	) ([]UserTransactionBucketSummary, error)
 	FindPreviousByUserID(userID uuid.UUID, before time.Time) (*domain.Transaction, bool, error)
 	GetTripleAmountAverageLast24HoursByUserID(userID uuid.UUID, excludeTxID *uuid.UUID) (int64, error)
 	Delete(id uuid.UUID) error
@@ -26,6 +32,14 @@ type RepositoryInterface interface {
 
 type Repository struct {
 	db *gorm.DB
+}
+
+type UserTransactionBucketSummary struct {
+	BucketStart  time.Time `gorm:"column:bucket_start"`
+	RequestCount int64     `gorm:"column:request_count"`
+	AnomalyCount int64     `gorm:"column:anomaly_count"`
+	AmountSum    int64     `gorm:"column:amount_sum"`
+	AmountAvg    float64   `gorm:"column:amount_avg"`
 }
 
 func NewRepository(db *gorm.DB) RepositoryInterface {
@@ -124,6 +138,35 @@ func (r *Repository) FindByUserID(userID uuid.UUID) ([]*domain.Transaction, erro
 		return nil, fmt.Errorf("find transactions by user id: %w", err)
 	}
 	return transactions, nil
+}
+
+func (r *Repository) GetUserTransactionSummary(
+	userID uuid.UUID,
+	from time.Time,
+	to time.Time,
+	bucket string,
+) ([]UserTransactionBucketSummary, error) {
+	summaries := make([]UserTransactionBucketSummary, 0)
+	if err := r.db.Raw(
+		`SELECT
+			date_trunc(?, created_at) AS bucket_start,
+			COUNT(*) AS request_count,
+			COALESCE(SUM(CASE WHEN fraud_status THEN 1 ELSE 0 END), 0) AS anomaly_count,
+			COALESCE(SUM(amount), 0) AS amount_sum,
+			COALESCE(AVG(amount), 0) AS amount_avg
+		FROM transactions
+		WHERE user_id = ? AND created_at >= ? AND created_at <= ?
+		GROUP BY 1
+		ORDER BY 1 ASC`,
+		bucket,
+		userID,
+		from,
+		to,
+	).Scan(&summaries).Error; err != nil {
+		return nil, fmt.Errorf("get user transaction summary: %w", err)
+	}
+
+	return summaries, nil
 }
 
 func (r *Repository) FindPreviousByUserID(userID uuid.UUID, before time.Time) (*domain.Transaction, bool, error) {

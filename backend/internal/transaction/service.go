@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log"
+	"strings"
 	"time"
 
 	"fraud-detection/internal/domain"
@@ -137,6 +138,31 @@ func (s *Service) GetTransactionsByUserID(userID uuid.UUID) ([]*domain.Transacti
 	return transactions, nil
 }
 
+func (s *Service) GetUserTransactionSummary(
+	userID uuid.UUID,
+	from time.Time,
+	to time.Time,
+	bucket string,
+) ([]UserTransactionBucketSummary, error) {
+	if to.Before(from) {
+		return nil, fmt.Errorf("get user transaction summary: invalid time range")
+	}
+
+	normalizedBucket := strings.ToLower(strings.TrimSpace(bucket))
+	switch normalizedBucket {
+	case "minute", "hour", "day":
+	default:
+		return nil, fmt.Errorf("get user transaction summary: invalid bucket %q", bucket)
+	}
+
+	summary, err := s.repository.GetUserTransactionSummary(userID, from, to, normalizedBucket)
+	if err != nil {
+		return nil, fmt.Errorf("get user transaction summary: %w", err)
+	}
+
+	return summary, nil
+}
+
 func (s *Service) GetPreviousTransactionByUserID(userID uuid.UUID, before time.Time) (*domain.Transaction, bool, error) {
 	transaction, found, err := s.repository.FindPreviousByUserID(userID, before)
 	if err != nil {
@@ -209,15 +235,15 @@ func (s *Service) PublishTransactionEvaluated(ctx context.Context, transaction *
 	}
 
 	evt := TransactionEvaluatedEvent{
-		TransactionID:     transaction.ID.String(),
-		UserID:            transaction.UserID.String(),
-		UserName:          transaction.User.Name,
-		UserSurname:       transaction.User.Surname,
-		Amount:            transaction.Amount,
-		Location:          transaction.Location,
-		FraudStatus:       transaction.FraudStatus,
-		CreatedAt:         transaction.CreatedAt,
-		EvaluatedAt:       evaluatedAt,
+		TransactionID: transaction.ID.String(),
+		UserID:        transaction.UserID.String(),
+		UserName:      transaction.User.Name,
+		UserSurname:   transaction.User.Surname,
+		Amount:        transaction.Amount,
+		Location:      transaction.Location,
+		FraudStatus:   transaction.FraudStatus,
+		CreatedAt:     transaction.CreatedAt,
+		EvaluatedAt:   evaluatedAt,
 	}
 
 	if err := s.evaluatedPublisher.PublishTransactionEvaluated(ctx, evt); err != nil {

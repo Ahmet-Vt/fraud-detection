@@ -4,6 +4,8 @@ import (
 	"errors"
 	"log"
 	"net/http"
+	"strings"
+	"time"
 
 	"fraud-detection/internal/domain"
 	"fraud-detection/internal/secureerr"
@@ -44,6 +46,7 @@ func (h *Handler) RegisterRoutes(router gin.IRouter) {
 	router.GET("/transactions/:id", h.GetTransactionByID)
 	router.GET("/transactions", h.GetAllTransactions)
 	router.GET("/transactions/user/:id", h.GetTransactionsByUserID)
+	router.GET("/transactions/user/:id/summary", h.GetUserTransactionSummary)
 	router.DELETE("/transactions/:id", h.DeleteTransaction)
 }
 
@@ -164,6 +167,98 @@ func (h *Handler) GetTransactionsByUserID(c *gin.Context) {
 	}
 
 	c.JSON(http.StatusOK, toTransactionResponses(transactions))
+}
+
+type transactionSummaryResponse struct {
+	BucketStart  time.Time `json:"bucket_start"`
+	RequestCount int64     `json:"request_count"`
+	AnomalyCount int64     `json:"anomaly_count"`
+	AmountSum    int64     `json:"amount_sum"`
+	AmountAvg    float64   `json:"amount_avg"`
+}
+
+// GetUserTransactionSummary godoc
+// @Summary Get user transaction summary
+// @Description Returns bucket-based transaction aggregates for a user.
+// @Tags transactions
+// @Produce json
+// @Param id path string true "User ID"
+// @Param from query string false "Range start in RFC3339 (default: now-24h)"
+// @Param to query string false "Range end in RFC3339 (default: now)"
+// @Param bucket query string false "Bucket unit: minute|hour|day (default: minute)"
+// @Success 200 {array} transaction.transactionSummaryResponse
+// @Failure 400 {object} apidoc.InvalidUserIDError
+// @Failure 500 {object} apidoc.InternalServerError
+// @Router /transactions/user/{id}/summary [get]
+func (h *Handler) GetUserTransactionSummary(c *gin.Context) {
+	userID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		h.writeError(c, secureerr.BadRequest(
+			"INVALID_USER_ID",
+			"invalid user id",
+			err,
+			map[string]string{"user_id": c.Param("id")},
+		))
+		return
+	}
+
+	now := time.Now().UTC()
+	from := now.Add(-24 * time.Hour)
+	to := now
+	bucket := "minute"
+
+	if rawFrom := strings.TrimSpace(c.Query("from")); rawFrom != "" {
+		parsedFrom, parseErr := time.Parse(time.RFC3339, rawFrom)
+		if parseErr != nil {
+			h.writeError(c, secureerr.BadRequest(
+				"INVALID_FROM",
+				"invalid from value",
+				parseErr,
+				map[string]string{"from": rawFrom},
+			))
+			return
+		}
+		from = parsedFrom
+	}
+	if rawTo := strings.TrimSpace(c.Query("to")); rawTo != "" {
+		parsedTo, parseErr := time.Parse(time.RFC3339, rawTo)
+		if parseErr != nil {
+			h.writeError(c, secureerr.BadRequest(
+				"INVALID_TO",
+				"invalid to value",
+				parseErr,
+				map[string]string{"to": rawTo},
+			))
+			return
+		}
+		to = parsedTo
+	}
+	if rawBucket := strings.TrimSpace(c.Query("bucket")); rawBucket != "" {
+		bucket = rawBucket
+	}
+
+	summary, err := h.service.GetUserTransactionSummary(userID, from, to, bucket)
+	if err != nil {
+		if strings.Contains(err.Error(), "invalid time range") || strings.Contains(err.Error(), "invalid bucket") {
+			h.writeError(c, secureerr.BadRequest("INVALID_QUERY", err.Error(), err, nil))
+			return
+		}
+		h.writeError(c, h.mapError(err))
+		return
+	}
+
+	response := make([]transactionSummaryResponse, 0, len(summary))
+	for _, item := range summary {
+		response = append(response, transactionSummaryResponse{
+			BucketStart:  item.BucketStart,
+			RequestCount: item.RequestCount,
+			AnomalyCount: item.AnomalyCount,
+			AmountSum:    item.AmountSum,
+			AmountAvg:    item.AmountAvg,
+		})
+	}
+
+	c.JSON(http.StatusOK, response)
 }
 
 // DeleteTransaction godoc
