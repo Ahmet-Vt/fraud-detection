@@ -26,11 +26,10 @@ const chartWindowPoints = 240
 const sseReconnectBaseMs = 1000
 const sseReconnectMaxMs = 60_000
 
-function formatBucketLabel(date: Date): string {
+function formatChartBucketTimeLabel(date: Date): string {
   return date.toLocaleTimeString([], {
     hour: '2-digit',
     minute: '2-digit',
-    second: '2-digit',
     hour12: false,
   })
 }
@@ -38,7 +37,7 @@ function formatBucketLabel(date: Date): string {
 function createInitialFraudRateSeries(now = Date.now()): FraudRatePoint[] {
   const start = now
   return Array.from({ length: chartWindowPoints }, (_, index) => ({
-    minuteLabel: formatBucketLabel(new Date(start + index * chartBucketMs)),
+    minuteLabel: formatChartBucketTimeLabel(new Date(start + index * chartBucketMs)),
     anomalyRate: null,
     requestCount: 0,
     fraudCount: 0,
@@ -204,14 +203,13 @@ export function useLiveTransactions({
       const suspiciousCount = batch.filter((tx) => tx.fraudstatus).length
       const anomalyRate = total === 0 ? 0 : (suspiciousCount / total) * 100
       const point: FraudRatePoint = {
-        minuteLabel: formatBucketLabel(new Date()),
+        minuteLabel: formatChartBucketTimeLabel(new Date()),
         anomalyRate: Number(anomalyRate.toFixed(2)),
         requestCount: total,
         fraudCount: suspiciousCount,
       }
 
       setFraudRateSeries((prev) => {
-        // First hour: fill preallocated timeline from left to right.
         if (nextChartWriteIndexRef.current < chartWindowPoints) {
           const next = [...prev]
           next[nextChartWriteIndexRef.current] = {
@@ -222,7 +220,6 @@ export function useLiveTransactions({
           return next
         }
 
-        // After first hour: keep a sliding 1-hour window.
         const shifted = prev.slice(1)
         shifted.push(point)
         return shifted
