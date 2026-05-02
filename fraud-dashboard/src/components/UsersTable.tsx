@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useScreen } from '../config/ScreenContext'
+import { formatDateTime } from '../lib/formatDateTime'
 
 type UsersTableProps = {
   usersUrl: string
@@ -86,33 +87,23 @@ export default function UsersTable({ usersUrl }: UsersTableProps) {
     return 'badge badge-ghost'
   }
 
-  const formatDate = (value: string) => {
-    const date = new Date(value)
-    if (Number.isNaN(date.getTime())) return '-'
-    const dd = String(date.getDate()).padStart(2, '0')
-    const mm = String(date.getMonth() + 1).padStart(2, '0')
-    const yyyy = String(date.getFullYear())
-    return `${dd}:${mm}:${yyyy}`
-  }
-
   const totalPages = Math.max(1, Math.ceil(users.length / pageSize))
   const pagedUsers = users.slice((page - 1) * pageSize, page * pageSize)
 
   return (
     <div className="card bg-base-100 shadow-md">
       <div className={`card-body ${ui.cardBodyPadding}`}>
-        <div className="flex items-center justify-between gap-2">
-          <h2 className={`card-title ${ui.cardTitleText}`}>Users</h2>
-          <span className={`badge badge-outline ${ui.badgeSize}`}>{users.length} users</span>
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className={`card-title min-w-0 ${ui.cardTitleText}`}>Users</h2>
+          <span className={`badge badge-outline shrink-0 ${ui.badgeSize}`}>{users.length} users</span>
         </div>
         {usersError && <div className={`alert alert-error ${ui.tableCellText}`}>{usersError}</div>}
         {isUsersLoading && <div className={`alert alert-info ${ui.tableCellText}`}>Loading users...</div>}
-        <div className={`${isMd ? 'max-h-[22rem]' : 'max-h-[28rem]'} overflow-auto`}>
-          <table className={`table table-zebra ${ui.tableSize}`}>
+        <div className={`min-w-0 max-w-full ${isMd ? 'max-h-[22rem]' : 'max-h-[28rem]'} overflow-x-auto overflow-y-auto`}>
+          <table className={`table table-zebra ${ui.tableSize} min-w-[18rem]`}>
             <thead>
               <tr className={`sticky top-0 z-10 bg-base-100 ${ui.tableCellText}`}>
                 <th>User</th>
-                <th>User ID</th>
                 {!isMd && <th>Email</th>}
                 <th>Status</th>
                 <th>Created At</th>
@@ -121,7 +112,7 @@ export default function UsersTable({ usersUrl }: UsersTableProps) {
             <tbody>
               {!isUsersLoading && users.length === 0 ? (
                 <tr>
-                  <td colSpan={isMd ? 4 : 5} className="text-center opacity-70">
+                  <td colSpan={isMd ? 3 : 4} className="text-center opacity-70">
                     No users found.
                   </td>
                 </tr>
@@ -133,12 +124,11 @@ export default function UsersTable({ usersUrl }: UsersTableProps) {
                     onClick={() => navigate(`/users/${encodeURIComponent(row.id)}`)}
                   >
                     <td>{`${row.name} ${row.surname}`.trim()}</td>
-                    <td className="font-medium">{row.id}</td>
                     {!isMd && <td>{row.email ?? '-'}</td>}
                     <td>
                       <span className={`${getStatusBadgeClass(row.status)} ${ui.badgeSize}`}>{row.status}</span>
                     </td>
-                    <td>{formatDate(row.createdAt)}</td>
+                    <td className="whitespace-nowrap">{formatDateTime(row.createdAt)}</td>
                   </tr>
                 ))
               )}
@@ -146,11 +136,11 @@ export default function UsersTable({ usersUrl }: UsersTableProps) {
           </table>
         </div>
         {users.length > 0 && (
-          <div className="mt-3 flex items-center justify-between">
-            <span className={ui.tableCellText}>
+          <div className="mt-3 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+            <span className={`min-w-0 ${ui.tableCellText}`}>
               Page {page} / {totalPages} - 100 rows per page
             </span>
-            <div className="join">
+            <div className="join shrink-0">
               <button
                 type="button"
                 className={`btn join-item ${isMd ? 'btn-xs' : 'btn-sm'}`}
