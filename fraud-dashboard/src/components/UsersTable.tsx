@@ -1,9 +1,9 @@
 import { useEffect, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import { useScreen } from '../config/ScreenContext'
 
 type UsersTableProps = {
   usersUrl: string
-  onSelectUser?: (user: UserRow) => void
 }
 
 export type UserRow = {
@@ -15,7 +15,8 @@ export type UserRow = {
   createdAt: string
 }
 
-export default function UsersTable({ usersUrl, onSelectUser }: UsersTableProps) {
+export default function UsersTable({ usersUrl }: UsersTableProps) {
+  const navigate = useNavigate()
   const { isMd, ui } = useScreen()
   const [users, setUsers] = useState<UserRow[]>([])
   const [isUsersLoading, setIsUsersLoading] = useState(false)
@@ -128,8 +129,8 @@ export default function UsersTable({ usersUrl, onSelectUser }: UsersTableProps) 
                 pagedUsers.map((row) => (
                   <tr
                     key={row.id}
-                    className={`${ui.tableCellText} ${onSelectUser ? 'cursor-pointer hover:bg-base-200' : ''}`}
-                    onClick={() => onSelectUser?.(row)}
+                    className={`${ui.tableCellText} cursor-pointer hover:bg-base-200`}
+                    onClick={() => navigate(`/users/${encodeURIComponent(row.id)}`)}
                   >
                     <td>{`${row.name} ${row.surname}`.trim()}</td>
                     <td className="font-medium">{row.id}</td>

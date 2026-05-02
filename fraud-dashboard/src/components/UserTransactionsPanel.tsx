@@ -37,15 +37,6 @@ function formatDate(value: string): string {
   return `${dd}:${mm}:${yyyy}`
 }
 
-function formatTime(value: string): string {
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return '--:--:--'
-  const hh = String(date.getHours()).padStart(2, '0')
-  const mm = String(date.getMinutes()).padStart(2, '0')
-  const ss = String(date.getSeconds()).padStart(2, '0')
-  return `${hh}:${mm}:${ss}`
-}
-
 export default function UserTransactionsPanel({
   user,
   onBack,
@@ -246,7 +237,15 @@ export default function UserTransactionsPanel({
                       <td>${tx.amount.toLocaleString()}</td>
                       {!isMd && <td>{tx.location}</td>}
                       <td>{tx.transactionStatus}</td>
-                      <td>{tx.fraudStatus ? 'anomaly' : 'approved'}</td>
+                      <td>
+                        <span
+                          className={`inline-flex h-6 w-[5.75rem] shrink-0 items-center justify-center rounded-[8px] text-xs font-medium text-white ${
+                            tx.fraudStatus ? 'bg-red-600' : 'bg-green-600'
+                          }`}
+                        >
+                          {tx.fraudStatus ? 'Anomaly' : 'Approved'}
+                        </span>
+                      </td>
                       <td>{formatDate(tx.createdAt)}</td>
                     </tr>
                   ))
