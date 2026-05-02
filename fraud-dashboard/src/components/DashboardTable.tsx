@@ -1,5 +1,6 @@
 import { useLayoutEffect, useRef } from 'react'
 import { useScreen } from '../config/ScreenContext'
+import { formatLiveDateTime } from '../lib/formatDateTime'
 import type { LiveTransaction } from '../hooks/useLiveTransactions'
 
 type DashboardTableProps = {
@@ -50,9 +51,9 @@ export default function DashboardTable({
   return (
     <div className="card bg-base-100 shadow-md">
       <div className={`card-body ${ui.cardBodyPadding}`}>
-        <div className="flex items-center justify-between gap-2">
-          <h2 className={`card-title ${ui.cardTitleText}`}>Live Transaction Feed</h2>
-          <div className="flex items-center gap-2">
+        <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+          <h2 className={`card-title min-w-0 ${ui.cardTitleText}`}>Live Transaction Feed</h2>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
             <span className={`${connectionBadgeClass} ${ui.badgeSize}`}>{connectionMode}</span>
             <span className={`badge badge-info badge-outline ${ui.badgeSize}`}>{rows.length} items</span>
           </div>
@@ -64,9 +65,9 @@ export default function DashboardTable({
         <div
           ref={scrollContainerRef}
           onScroll={handleScroll}
-          className={`${isMd ? 'max-h-[22rem]' : 'max-h-[28rem]'} overflow-auto [overflow-anchor:none]`}
+          className={`min-w-0 max-w-full ${isMd ? 'max-h-[22rem]' : 'max-h-[28rem]'} overflow-x-auto overflow-y-auto [overflow-anchor:none]`}
         >
-          <table className={`table table-zebra ${ui.tableSize}`}>
+          <table className={`table table-zebra ${ui.tableSize} min-w-[18rem]`}>
             <thead>
               <tr className={`sticky top-0 z-10 bg-base-100 ${ui.tableCellText}`}>
                 <th>User</th>
@@ -74,12 +75,13 @@ export default function DashboardTable({
                 <th>Amount</th>
                 {!isMd && <th>Location</th>}
                 <th>Fraud</th>
+                <th>Created</th>
               </tr>
             </thead>
             <tbody>
               {rows.length === 0 ? (
                 <tr>
-                  <td colSpan={isMd ? 4 : 5} className="text-center opacity-70">
+                  <td colSpan={isMd ? 5 : 6} className="text-center opacity-70">
                     No transaction received yet.
                   </td>
                 </tr>
@@ -97,9 +99,10 @@ export default function DashboardTable({
                       <span
                         className={`${row.fraudstatus ? 'badge bg-red-600 text-white border-red-700' : 'badge badge-success badge-soft'} ${ui.badgeSize}`}
                       >
-                        {row.fraudstatus ? 'suspicious' : 'approved'}
+                        {row.fraudstatus ? 'anomaly' : 'approved'}
                       </span>
                     </td>
+                    <td className="whitespace-nowrap">{formatLiveDateTime(row.createdat)}</td>
                   </tr>
                 ))
               )}

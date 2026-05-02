@@ -1,4 +1,5 @@
 import { useScreen } from '../config/ScreenContext'
+import { formatLiveDateTime } from '../lib/formatDateTime'
 
 export type LiveFraudData = {
   id: string
@@ -15,6 +16,7 @@ type LiveFraudDataProps = {
 
 export default function LiveFraudData({ data }: LiveFraudDataProps) {
   const { isMd, ui } = useScreen()
+  const fraudLabel = data.fraudstatus ? 'anomaly' : 'approved'
   const fraudBadgeClass = data.fraudstatus
     ? 'badge badge-error badge-soft'
     : 'badge badge-success badge-soft'
@@ -37,12 +39,17 @@ export default function LiveFraudData({ data }: LiveFraudDataProps) {
           <div>
             <span className="font-semibold">location:</span> {data.location}
           </div>
-          <div className="flex items-center gap-2">
+        </div>
+
+        <div
+          className={`mt-3 flex flex-col gap-2 border-t border-base-300 pt-3 sm:flex-row sm:items-center sm:justify-between ${ui.tableCellText}`}
+        >
+          <div className="flex min-w-0 flex-wrap items-center gap-2">
             <span className="font-semibold">fraudstatus:</span>
-            <span className={fraudBadgeClass}>{String(data.fraudstatus)}</span>
+            <span className={fraudBadgeClass}>{fraudLabel}</span>
           </div>
-          <div className={isMd ? '' : 'col-span-2'}>
-            <span className="font-semibold">createdat:</span> {data.createdat}
+          <div className="self-end shrink-0 whitespace-nowrap text-right sm:self-auto">
+            <span className="font-semibold">createdat:</span> {formatLiveDateTime(data.createdat)}
           </div>
         </div>
       </div>

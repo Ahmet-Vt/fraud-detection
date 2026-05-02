@@ -1,7 +1,6 @@
 import { NavLink } from 'react-router-dom'
 import arrowIcon from '../assets/arrow.svg'
 
-/** Same shell as the file-tree nav so stats badges align to that width. */
 const sidebarNavPanelClass =
   'menu menu-sm w-full rounded-box border border-base-300 bg-base-200 p-2'
 
@@ -70,12 +69,15 @@ export default function Sidebar({
 }: SidebarProps) {
   if (isMobile) {
     return (
-      <div className="mb-3 flex justify-end">
-        <details className="dropdown dropdown-end">
-          <summary className="btn btn-sm btn-boxr" aria-label="Open navigation menu">
+      <div className="flex shrink-0 justify-start">
+        <details className="dropdown dropdown-bottom">
+          <summary
+            className="btn btn-square btn-sm border-base-300 bg-base-100 shadow-sm"
+            aria-label="Open navigation menu"
+          >
             ☰
           </summary>
-          <div className="dropdown-content z-[1] mt-2 w-56 rounded-box bg-base-100 p-2 shadow">
+          <div className="dropdown-content z-[100] mt-2 w-64 max-w-[min(18rem,calc(100vw-1rem))] rounded-box border border-base-300 bg-base-100 p-2 shadow-lg">
             <NavButtons />
           </div>
         </details>
@@ -84,7 +86,7 @@ export default function Sidebar({
   }
 
   return (
-    <aside className="sticky top-0 h-screen w-64 border-r border-base-300 bg-base-100 p-4">
+    <aside className="flex min-h-screen w-64 shrink-0 flex-col border-r border-base-300 bg-base-100 p-4">
       <h2 className="mb-4 text-lg font-semibold">Menu</h2>
       <NavButtons />
       <div className="mt-6 flex w-full flex-col gap-1 text-sm">

@@ -47,7 +47,7 @@ function toState(width: number): ScreenState {
     isLg,
     isDesktop,
     ui: {
-      pagePadding: isSm ? 'p-3' : isLg ? 'p-6' : 'p-8',
+      pagePadding: isXs ? 'p-2' : isSm ? 'p-3' : isLg ? 'p-6' : 'p-8',
       containerWidth: isMd ? 'max-w-full' : 'max-w-6xl',
       stackGap: isSm ? 'space-y-3' : 'space-y-4',
       titleText: isMd ? 'text-xl' : 'text-2xl',
