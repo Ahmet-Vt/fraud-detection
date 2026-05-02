@@ -129,7 +129,7 @@ func (s *Service) GetAllTransactions() ([]*domain.Transaction, error) {
 	return transactions, nil
 }
 
-func (s *Service) GetTransactionsByUserID(userID uuid.UUID, from *time.Time, to *time.Time) ([]*domain.Transaction, error) {
+func (s *Service) GetTransactionsByUserID(userID uuid.UUID, from *time.Time, to *time.Time, fraudOnly bool) ([]*domain.Transaction, error) {
 	if (from == nil) != (to == nil) {
 		return nil, fmt.Errorf("get transactions by user id: %w", ErrInvalidTimeRange)
 	}
@@ -137,7 +137,7 @@ func (s *Service) GetTransactionsByUserID(userID uuid.UUID, from *time.Time, to 
 		return nil, fmt.Errorf("get transactions by user id: %w", ErrInvalidTimeRange)
 	}
 
-	transactions, err := s.repository.FindByUserID(userID, from, to)
+	transactions, err := s.repository.FindByUserID(userID, from, to, fraudOnly)
 	if err != nil {
 		return nil, fmt.Errorf("get transactions by user id: %w", err)
 	}
@@ -150,6 +150,7 @@ func (s *Service) GetUserTransactionSummary(
 	from *time.Time,
 	to *time.Time,
 	bucket string,
+	fraudOnly bool,
 ) ([]UserTransactionBucketSummary, error) {
 	if (from == nil) != (to == nil) {
 		return nil, fmt.Errorf("get user transaction summary: %w", ErrInvalidTimeRange)
@@ -184,7 +185,7 @@ func (s *Service) GetUserTransactionSummary(
 		return nil, fmt.Errorf("get user transaction summary: invalid bucket %q: %w", bucket, ErrInvalidBucket)
 	}
 
-	summary, err := s.repository.GetUserTransactionSummary(userID, effFrom, effTo, normalizedBucket)
+	summary, err := s.repository.GetUserTransactionSummary(userID, effFrom, effTo, normalizedBucket, fraudOnly)
 	if err != nil {
 		return nil, fmt.Errorf("get user transaction summary: %w", err)
 	}

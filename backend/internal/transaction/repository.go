@@ -17,12 +17,13 @@ type RepositoryInterface interface {
 	UpdateStatus(transactionID uuid.UUID, status domain.Status) error
 	FindByID(id uuid.UUID) (*domain.Transaction, error)
 	FindAll() ([]*domain.Transaction, error)
-	FindByUserID(userID uuid.UUID, from *time.Time, to *time.Time) ([]*domain.Transaction, error)
+	FindByUserID(userID uuid.UUID, from *time.Time, to *time.Time, fraudOnly bool) ([]*domain.Transaction, error)
 	GetUserTransactionSummary(
 		userID uuid.UUID,
 		from time.Time,
 		to time.Time,
 		bucket string,
+		fraudOnly bool,
 	) ([]UserTransactionBucketSummary, error)
 	FindPreviousByUserID(userID uuid.UUID, before time.Time) (*domain.Transaction, bool, error)
 	GetTripleAmountAverageLast24HoursByUserID(userID uuid.UUID, excludeTxID *uuid.UUID) (int64, error)
@@ -132,9 +133,12 @@ func (r *Repository) FindAll() ([]*domain.Transaction, error) {
 	return transactions, nil
 }
 
-func (r *Repository) FindByUserID(userID uuid.UUID, from *time.Time, to *time.Time) ([]*domain.Transaction, error) {
+func (r *Repository) FindByUserID(userID uuid.UUID, from *time.Time, to *time.Time, fraudOnly bool) ([]*domain.Transaction, error) {
 	var transactions []*domain.Transaction
 	q := r.db.Preload("FraudRules").Where("user_id = ?", userID)
+	if fraudOnly {
+		q = q.Where("fraud_status = ?", true)
+	}
 	if from != nil {
 		q = q.Where("created_at >= ?", *from)
 	}
@@ -152,19 +156,25 @@ func (r *Repository) GetUserTransactionSummary(
 	from time.Time,
 	to time.Time,
 	bucket string,
+	fraudOnly bool,
 ) ([]UserTransactionBucketSummary, error) {
 	summaries := make([]UserTransactionBucketSummary, 0)
-	if err := r.db.Raw(
-		`SELECT
+	whereFraud := ""
+	if fraudOnly {
+		whereFraud = " AND fraud_status = TRUE"
+	}
+	query := `SELECT
 			date_trunc(?, created_at) AS bucket_start,
 			COUNT(*) AS request_count,
 			COALESCE(SUM(CASE WHEN fraud_status THEN 1 ELSE 0 END), 0) AS anomaly_count,
 			COALESCE(SUM(amount), 0) AS amount_sum,
 			COALESCE(AVG(amount), 0) AS amount_avg
 		FROM transactions
-		WHERE user_id = ? AND created_at >= ? AND created_at <= ?
+		WHERE user_id = ? AND created_at >= ? AND created_at <= ?` + whereFraud + `
 		GROUP BY 1
-		ORDER BY 1 ASC`,
+		ORDER BY 1 ASC`
+	if err := r.db.Raw(
+		query,
 		bucket,
 		userID,
 		from,

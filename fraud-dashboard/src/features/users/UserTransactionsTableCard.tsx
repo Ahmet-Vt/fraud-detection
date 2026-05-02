@@ -2,15 +2,8 @@ import { useEffect, useMemo, useState } from 'react'
 import { useScreen } from '../../config/ScreenContext'
 import { formatCalendarDayHeading, formatDateTime, localCalendarDayKey } from '../../lib/formatDateTime'
 import { AppCard, FraudStatusBadge, SimplePagination, tableScrollAreaClass } from '../../components/ui/dashboardUi'
-import type { DateRangePreset, UserTransaction } from './userDetailTransactions'
-
-const DATE_PRESET_OPTIONS: { value: DateRangePreset; label: string }[] = [
-  { value: 'today', label: 'Today' },
-  { value: 'weekly', label: 'Last 7 days' },
-  { value: 'monthly', label: 'This month' },
-  { value: 'yearly', label: 'This year' },
-  { value: 'all', label: 'All' },
-]
+import type { UserTransaction, UserTransactionDateRange } from './userDetailTransactions'
+import UserTransactionRangePickerButton from './UserTransactionRangePickerButton'
 
 const pageSize = 100
 
@@ -34,15 +27,15 @@ function transactionRowsWithDayBreaks(rows: UserTransaction[]): TransactionTable
 
 type UserTransactionsTableCardProps = {
   transactions: UserTransaction[]
-  datePreset: DateRangePreset
-  onDatePresetChange: (preset: DateRangePreset) => void
+  dateRange: UserTransactionDateRange
+  onDateRangeChange: (range: UserTransactionDateRange) => void
   isLoading: boolean
 }
 
 export default function UserTransactionsTableCard({
   transactions,
-  datePreset,
-  onDatePresetChange,
+  dateRange,
+  onDateRangeChange,
   isLoading,
 }: UserTransactionsTableCardProps) {
   const { isMd, ui } = useScreen()
@@ -66,25 +59,15 @@ export default function UserTransactionsTableCard({
   return (
     <AppCard bodyPaddingClass={ui.cardBodyPadding}>
       <h3 className={`card-title ${ui.cardTitleText}`}>Transactions</h3>
-      <div className="mb-3 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-end sm:justify-end">
-        <label className="form-control w-full max-w-[14rem] shrink-0">
-          <span className={`label py-0 ${ui.tableCellText}`}>
-            <span className="label-text font-medium">Date</span>
-          </span>
-          <select
-            className={`select select-bordered w-full ${isMd ? 'select-xs' : 'select-sm'}`}
-            value={datePreset}
-            disabled={isLoading}
-            onChange={(e) => onDatePresetChange(e.target.value as DateRangePreset)}
-            aria-label="Filter transactions by date range"
-          >
-            {DATE_PRESET_OPTIONS.map((opt) => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-        </label>
+      <div className="mb-3 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <p className={`m-0 min-w-0 opacity-80 ${ui.tableCellText}`}>Filter by date range</p>
+        <UserTransactionRangePickerButton
+          dateRange={dateRange}
+          onDateRangeChange={onDateRangeChange}
+          isLoading={isLoading}
+          buttonSizeClass={isMd ? 'btn-sm' : ''}
+          textClass={ui.tableCellText}
+        />
       </div>
       <div className={tableScrollAreaClass(isMd)}>
         <table className={`table table-zebra ${ui.tableSize} min-w-[20rem]`}>

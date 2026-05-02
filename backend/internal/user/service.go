@@ -34,7 +34,6 @@ func (s *Service) GetUserByID(id uuid.UUID) (*domain.User, error) {
 	if err != nil {
 		return nil, fmt.Errorf("get user by id: %w", err)
 	}
-
 	return user, nil
 }
 

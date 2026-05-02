@@ -45,7 +45,8 @@ type TimeRangeQuery struct {
 
 type userTransactionTimeBucketQuery struct {
 	TimeRangeQuery
-	Bucket string `form:"bucket"`
+	Bucket    string `form:"bucket"`
+	FraudOnly bool   `form:"fraud_only"`
 }
 
 func validateBoundTimeRange(fromPtr, toPtr *time.Time) *secureerr.Error {
@@ -87,10 +88,10 @@ func bindTimeRangeQuery(c *gin.Context) (fromPtr, toPtr *time.Time, secErr *secu
 	return q.From, q.To, nil
 }
 
-func bindUserTransactionTimeBucketQuery(c *gin.Context) (fromPtr, toPtr *time.Time, bucket string, secErr *secureerr.Error) {
+func bindUserTransactionTimeBucketQuery(c *gin.Context) (fromPtr, toPtr *time.Time, bucket string, fraudOnly bool, secErr *secureerr.Error) {
 	var q userTransactionTimeBucketQuery
 	if err := c.ShouldBindQuery(&q); err != nil {
-		return nil, nil, "", secureerr.BadRequest(
+		return nil, nil, "", false, secureerr.BadRequest(
 			"INVALID_QUERY",
 			"invalid query parameters",
 			err,
@@ -98,9 +99,9 @@ func bindUserTransactionTimeBucketQuery(c *gin.Context) (fromPtr, toPtr *time.Ti
 		)
 	}
 	if sec := validateBoundTimeRange(q.From, q.To); sec != nil {
-		return nil, nil, "", sec
+		return nil, nil, "", false, sec
 	}
-	return q.From, q.To, strings.TrimSpace(q.Bucket), nil
+	return q.From, q.To, strings.TrimSpace(q.Bucket), q.FraudOnly, nil
 }
 
 func NewHandler(service *Service) *Handler {
@@ -235,7 +236,7 @@ func (h *Handler) GetTransactionsByUserID(c *gin.Context) {
 		return
 	}
 
-	transactions, err := h.service.GetTransactionsByUserID(userID, fromPtr, toPtr)
+	transactions, err := h.service.GetTransactionsByUserID(userID, fromPtr, toPtr, false)
 	if err != nil {
 		h.writeError(c, h.mapError(err))
 		return
@@ -280,6 +281,7 @@ func bucketSummariesToResponses(summary []UserTransactionBucketSummary) []transa
 // @Param from query string false "Range start RFC3339 (omit with to for all-time)"
 // @Param to query string false "Range end RFC3339 (omit with from for all-time)"
 // @Param bucket query string false "Bucket unit: minute|hour|day (default day)"
+// @Param fraud_only query bool false "When true, transactions list and summary use only fraud_status=true rows"
 // @Success 200 {object} transaction.userTransactionsDetailResponse
 // @Failure 400 {object} apidoc.InvalidUserIDError
 // @Failure 500 {object} apidoc.InternalServerError
@@ -296,7 +298,7 @@ func (h *Handler) GetUserTransactionsDetail(c *gin.Context) {
 		return
 	}
 
-	fromPtr, toPtr, bucket, secErr := bindUserTransactionTimeBucketQuery(c)
+	fromPtr, toPtr, bucket, fraudOnly, secErr := bindUserTransactionTimeBucketQuery(c)
 	if secErr != nil {
 		h.writeError(c, secErr)
 		return
@@ -306,13 +308,13 @@ func (h *Handler) GetUserTransactionsDetail(c *gin.Context) {
 		bucket = "day"
 	}
 
-	transactions, err := h.service.GetTransactionsByUserID(userID, fromPtr, toPtr)
+	transactions, err := h.service.GetTransactionsByUserID(userID, fromPtr, toPtr, fraudOnly)
 	if err != nil {
 		h.writeError(c, h.mapError(err))
 		return
 	}
 
-	summary, err := h.service.GetUserTransactionSummary(userID, fromPtr, toPtr, bucket)
+	summary, err := h.service.GetUserTransactionSummary(userID, fromPtr, toPtr, bucket, fraudOnly)
 	if err != nil {
 		h.writeError(c, h.mapError(err))
 		return
@@ -326,13 +328,14 @@ func (h *Handler) GetUserTransactionsDetail(c *gin.Context) {
 
 // GetUserTransactionSummary godoc
 // @Summary Get user transaction summary
-// @Description Returns bucket-based transaction aggregates for a user.
+// @Description Returns bucket-based transaction aggregates for a user. With fraud_only=true, only fraud_status=true transactions are included in counts and amounts.
 // @Tags transactions
 // @Produce json
 // @Param id path string true "User ID"
 // @Param from query string false "Range start in RFC3339 (omit with to for all-time summary)"
 // @Param to query string false "Range end in RFC3339 (omit with from for all-time summary)"
 // @Param bucket query string false "Bucket unit: minute|hour|day (empty: day for all-time, minute when from/to set)"
+// @Param fraud_only query bool false "When true, aggregate only fraud_status=true transactions"
 // @Success 200 {array} transaction.transactionSummaryResponse
 // @Failure 400 {object} apidoc.InvalidUserIDError
 // @Failure 500 {object} apidoc.InternalServerError
@@ -349,13 +352,13 @@ func (h *Handler) GetUserTransactionSummary(c *gin.Context) {
 		return
 	}
 
-	fromPtr, toPtr, bucket, secErr := bindUserTransactionTimeBucketQuery(c)
+	fromPtr, toPtr, bucket, fraudOnly, secErr := bindUserTransactionTimeBucketQuery(c)
 	if secErr != nil {
 		h.writeError(c, secErr)
 		return
 	}
 
-	summary, err := h.service.GetUserTransactionSummary(userID, fromPtr, toPtr, bucket)
+	summary, err := h.service.GetUserTransactionSummary(userID, fromPtr, toPtr, bucket, fraudOnly)
 	if err != nil {
 		h.writeError(c, h.mapError(err))
 		return

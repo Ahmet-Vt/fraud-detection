@@ -122,7 +122,7 @@ const docTemplate = `{
         },
         "/transactions/user/{id}": {
             "get": {
-                "description": "Returns transactions for a specific user UUID.",
+                "description": "Returns transactions for a specific user UUID. Optional from/to (RFC3339) filter on created_at; both must be sent together.",
                 "produces": [
                     "application/json"
                 ],
@@ -137,6 +137,18 @@ const docTemplate = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Range start RFC3339 (omit with to for all-time list)",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Range end RFC3339 (omit with from for all-time list)",
+                        "name": "to",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -146,6 +158,139 @@ const docTemplate = `{
                             "type": "array",
                             "items": {
                                 "$ref": "#/definitions/transaction.TransactionResponse"
+                            }
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apidoc.InvalidUserIDError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apidoc.InternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/transactions/user/{id}/detail": {
+            "get": {
+                "description": "Returns transactions and bucket summary in one response (same filters as separate list/summary calls). Default bucket is day when omitted.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "transactions"
+                ],
+                "summary": "List user transactions with summary",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Range start RFC3339 (omit with to for all-time)",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Range end RFC3339 (omit with from for all-time)",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bucket unit: minute|hour|day (default day)",
+                        "name": "bucket",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "When true, transactions list and summary use only fraud_status=true rows",
+                        "name": "fraud_only",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/transaction.userTransactionsDetailResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/apidoc.InvalidUserIDError"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/apidoc.InternalServerError"
+                        }
+                    }
+                }
+            }
+        },
+        "/transactions/user/{id}/summary": {
+            "get": {
+                "description": "Returns bucket-based transaction aggregates for a user. With fraud_only=true, only fraud_status=true transactions are included in counts and amounts.",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "transactions"
+                ],
+                "summary": "Get user transaction summary",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "User ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "string",
+                        "description": "Range start in RFC3339 (omit with to for all-time summary)",
+                        "name": "from",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Range end in RFC3339 (omit with from for all-time summary)",
+                        "name": "to",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Bucket unit: minute|hour|day (empty: day for all-time, minute when from/to set)",
+                        "name": "bucket",
+                        "in": "query"
+                    },
+                    {
+                        "type": "boolean",
+                        "description": "When true, aggregate only fraud_status=true transactions",
+                        "name": "fraud_only",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "type": "array",
+                            "items": {
+                                "$ref": "#/definitions/transaction.transactionSummaryResponse"
                             }
                         }
                     },
@@ -653,6 +798,101 @@ const docTemplate = `{
                     "type": "boolean",
                     "x-order": "5",
                     "example": false
+                },
+                "created_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "x-order": "6",
+                    "example": "2026-05-02T12:00:00Z"
+                }
+            }
+        },
+        "transaction.transactionResponse": {
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "x-order": "0",
+                    "example": "1dc90ef0-76a0-4cb2-891e-5193c60aa82f"
+                },
+                "user_id": {
+                    "type": "string",
+                    "format": "uuid",
+                    "x-order": "1",
+                    "example": "4ca5e74c-3a07-4010-9f07-14e90a35868b"
+                },
+                "amount": {
+                    "type": "integer",
+                    "x-order": "2",
+                    "example": 5000
+                },
+                "location": {
+                    "type": "string",
+                    "x-order": "3",
+                    "example": "Istanbul"
+                },
+                "transaction_status": {
+                    "enum": [
+                        "pending",
+                        "completed",
+                        "failed"
+                    ],
+                    "allOf": [
+                        {
+                            "$ref": "#/definitions/domain.Status"
+                        }
+                    ],
+                    "x-order": "4",
+                    "example": "pending"
+                },
+                "fraud_status": {
+                    "type": "boolean",
+                    "x-order": "5",
+                    "example": false
+                },
+                "created_at": {
+                    "type": "string",
+                    "format": "date-time",
+                    "x-order": "6",
+                    "example": "2026-05-02T12:00:00Z"
+                }
+            }
+        },
+        "transaction.transactionSummaryResponse": {
+            "type": "object",
+            "properties": {
+                "amount_avg": {
+                    "type": "number"
+                },
+                "amount_sum": {
+                    "type": "integer"
+                },
+                "anomaly_count": {
+                    "type": "integer"
+                },
+                "bucket_start": {
+                    "type": "string"
+                },
+                "request_count": {
+                    "type": "integer"
+                }
+            }
+        },
+        "transaction.userTransactionsDetailResponse": {
+            "type": "object",
+            "properties": {
+                "summary": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/transaction.transactionSummaryResponse"
+                    }
+                },
+                "transactions": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/transaction.transactionResponse"
+                    }
                 }
             }
         },

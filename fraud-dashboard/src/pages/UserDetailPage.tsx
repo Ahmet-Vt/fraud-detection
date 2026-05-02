@@ -3,15 +3,15 @@ import { useParams } from 'react-router-dom'
 import { useScreen } from '../config/ScreenContext'
 import UserTransactionsChartCard from '../features/users/UserTransactionsChartCard'
 import UserTransactionsTableCard from '../features/users/UserTransactionsTableCard'
-import type { DateRangePreset } from '../features/users/userDetailTransactions'
+import { rangeLastNDays, type UserTransactionDateRange } from '../features/users/userDetailTransactions'
 import type { UserRow } from '../features/users/userTypes'
 import { useUserMember } from '../features/users/hooks/useUserMember'
 import { useUserTransactionDetail } from '../features/users/hooks/useUserTransactionDetail'
 
 function UserDetailTransactionsBody({ user }: { user: UserRow }) {
   const { ui } = useScreen()
-  const [datePreset, setDatePreset] = useState<DateRangePreset>('all')
-  const { transactions, dailySummary, isLoading, error } = useUserTransactionDetail(user.id, datePreset)
+  const [dateRange, setDateRange] = useState<UserTransactionDateRange>(() => rangeLastNDays(7))
+  const { transactions, dailySummary, isLoading, error } = useUserTransactionDetail(user.id, dateRange)
 
   const anomalyCount = useMemo(
     () => transactions.reduce((acc, tx) => acc + (tx.fraudStatus ? 1 : 0), 0),
@@ -30,8 +30,8 @@ function UserDetailTransactionsBody({ user }: { user: UserRow }) {
       />
       <UserTransactionsTableCard
         transactions={transactions}
-        datePreset={datePreset}
-        onDatePresetChange={setDatePreset}
+        dateRange={dateRange}
+        onDateRangeChange={setDateRange}
         isLoading={isLoading}
       />
     </div>

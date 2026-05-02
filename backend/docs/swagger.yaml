@@ -177,6 +177,11 @@ definitions:
         example: 5000
         type: integer
         x-order: "2"
+      created_at:
+        example: "2026-05-02T12:00:00Z"
+        format: date-time
+        type: string
+        x-order: "6"
       fraud_status:
         example: false
         type: boolean
@@ -204,6 +209,69 @@ definitions:
         format: uuid
         type: string
         x-order: "1"
+    type: object
+  transaction.transactionResponse:
+    properties:
+      amount:
+        example: 5000
+        type: integer
+        x-order: "2"
+      created_at:
+        example: "2026-05-02T12:00:00Z"
+        format: date-time
+        type: string
+        x-order: "6"
+      fraud_status:
+        example: false
+        type: boolean
+        x-order: "5"
+      id:
+        example: 1dc90ef0-76a0-4cb2-891e-5193c60aa82f
+        format: uuid
+        type: string
+        x-order: "0"
+      location:
+        example: Istanbul
+        type: string
+        x-order: "3"
+      transaction_status:
+        allOf:
+        - $ref: '#/definitions/domain.Status'
+        enum:
+        - pending
+        - completed
+        - failed
+        example: pending
+        x-order: "4"
+      user_id:
+        example: 4ca5e74c-3a07-4010-9f07-14e90a35868b
+        format: uuid
+        type: string
+        x-order: "1"
+    type: object
+  transaction.transactionSummaryResponse:
+    properties:
+      amount_avg:
+        type: number
+      amount_sum:
+        type: integer
+      anomaly_count:
+        type: integer
+      bucket_start:
+        type: string
+      request_count:
+        type: integer
+    type: object
+  transaction.userTransactionsDetailResponse:
+    properties:
+      summary:
+        items:
+          $ref: '#/definitions/transaction.transactionSummaryResponse'
+        type: array
+      transactions:
+        items:
+          $ref: '#/definitions/transaction.transactionResponse'
+        type: array
     type: object
   user.CreateUserRequest:
     properties:
@@ -405,12 +473,21 @@ paths:
       - transactions
   /transactions/user/{id}:
     get:
-      description: Returns transactions for a specific user UUID.
+      description: Returns transactions for a specific user UUID. Optional from/to
+        (RFC3339) filter on created_at; both must be sent together.
       parameters:
       - description: User ID
         in: path
         name: id
         required: true
+        type: string
+      - description: Range start RFC3339 (omit with to for all-time list)
+        in: query
+        name: from
+        type: string
+      - description: Range end RFC3339 (omit with from for all-time list)
+        in: query
+        name: to
         type: string
       produces:
       - application/json
@@ -430,6 +507,98 @@ paths:
           schema:
             $ref: '#/definitions/apidoc.InternalServerError'
       summary: List transactions by user
+      tags:
+      - transactions
+  /transactions/user/{id}/detail:
+    get:
+      description: Returns transactions and bucket summary in one response (same filters
+        as separate list/summary calls). Default bucket is day when omitted.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Range start RFC3339 (omit with to for all-time)
+        in: query
+        name: from
+        type: string
+      - description: Range end RFC3339 (omit with from for all-time)
+        in: query
+        name: to
+        type: string
+      - description: 'Bucket unit: minute|hour|day (default day)'
+        in: query
+        name: bucket
+        type: string
+      - description: When true, transactions list and summary use only fraud_status=true
+          rows
+        in: query
+        name: fraud_only
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/transaction.userTransactionsDetailResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apidoc.InvalidUserIDError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apidoc.InternalServerError'
+      summary: List user transactions with summary
+      tags:
+      - transactions
+  /transactions/user/{id}/summary:
+    get:
+      description: Returns bucket-based transaction aggregates for a user. With fraud_only=true,
+        only fraud_status=true transactions are included in counts and amounts.
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Range start in RFC3339 (omit with to for all-time summary)
+        in: query
+        name: from
+        type: string
+      - description: Range end in RFC3339 (omit with from for all-time summary)
+        in: query
+        name: to
+        type: string
+      - description: 'Bucket unit: minute|hour|day (empty: day for all-time, minute
+          when from/to set)'
+        in: query
+        name: bucket
+        type: string
+      - description: When true, aggregate only fraud_status=true transactions
+        in: query
+        name: fraud_only
+        type: boolean
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/transaction.transactionSummaryResponse'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/apidoc.InvalidUserIDError'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/apidoc.InternalServerError'
+      summary: Get user transaction summary
       tags:
       - transactions
   /users:

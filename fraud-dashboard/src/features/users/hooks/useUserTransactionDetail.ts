@@ -1,17 +1,26 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { apiUserTransactionDetailUrl } from '../../../api/endpoints'
 import {
-  userDetailDateRangeQuery,
+  userTransactionDetailQuery,
   type DailySummaryPoint,
-  type DateRangePreset,
   type UserTransaction,
+  type UserTransactionDateRange,
 } from '../userDetailTransactions'
 
-export function useUserTransactionDetail(userId: string, datePreset: DateRangePreset) {
+export function useUserTransactionDetail(userId: string, dateRange: UserTransactionDateRange) {
   const [transactions, setTransactions] = useState<UserTransaction[]>([])
   const [dailySummary, setDailySummary] = useState<DailySummaryPoint[]>([])
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  const kind = dateRange.kind
+  const fromDay = dateRange.kind === 'between' ? dateRange.fromDay : ''
+  const toDay = dateRange.kind === 'between' ? dateRange.toDay : ''
+
+  const rangeForFetch = useMemo<UserTransactionDateRange>(() => {
+    if (kind === 'all') return { kind: 'all' }
+    return { kind: 'between', fromDay, toDay }
+  }, [kind, fromDay, toDay])
 
   useEffect(() => {
     if (!userId) {
@@ -29,8 +38,7 @@ export function useUserTransactionDetail(userId: string, datePreset: DateRangePr
       setIsLoading(true)
       setError(null)
       try {
-        const rangeQs = userDetailDateRangeQuery(datePreset)
-        const detailQuery = rangeQs ? `bucket=day&${rangeQs}` : 'bucket=day'
+        const detailQuery = userTransactionDetailQuery(rangeForFetch)
         const detailResponse = await fetch(apiUserTransactionDetailUrl(userId, detailQuery), {
           signal: controller.signal,
         })
@@ -92,7 +100,7 @@ export function useUserTransactionDetail(userId: string, datePreset: DateRangePr
       cancelled = true
       controller.abort()
     }
-  }, [userId, datePreset])
+  }, [userId, rangeForFetch])
 
   return { transactions, dailySummary, isLoading, error }
 }

@@ -1,5 +1,6 @@
 @import "tailwindcss";
 @plugin "daisyui";
+@import "react-day-picker/style.css";
 
 @keyframes anomaly-bell-pulse {
   0%,
