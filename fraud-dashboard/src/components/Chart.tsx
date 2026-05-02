@@ -47,7 +47,7 @@ export default function Chart({ data, requestCount, fraudCount }: ChartProps) {
           </div>
         </div>
 
-        <div className={`${ui.chartHeight} w-full`}>
+        <div className={`${ui.chartHeight} min-w-0 w-full max-w-full`}>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart
               data={chartData}
@@ -63,10 +63,7 @@ export default function Chart({ data, requestCount, fraudCount }: ChartProps) {
                 dataKey="pointIndex"
                 type="number"
                 ticks={xAxisTicks}
-                tickFormatter={(value: number) => {
-                  const label = chartData[value]?.minuteLabel
-                  return label ? label.slice(0, 5) : ''
-                }}
+                tickFormatter={(value: number) => chartData[value]?.minuteLabel ?? ''}
                 minTickGap={isSm ? 24 : isMd ? 20 : 32}
               />
               <YAxis
@@ -81,7 +78,7 @@ export default function Chart({ data, requestCount, fraudCount }: ChartProps) {
                 labelFormatter={(value) => {
                   const index = Number(value)
                   const point = chartData[index]
-                  if (!point) return 'Time: --:--:--'
+                  if (!point) return 'Time: --:--'
                   return `Time: ${point.minuteLabel} | Requests: ${point.requestCount} | Fraud: ${point.fraudCount}`
                 }}
                 formatter={(value) =>

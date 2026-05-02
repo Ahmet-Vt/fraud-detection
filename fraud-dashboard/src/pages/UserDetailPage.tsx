@@ -1,14 +1,11 @@
 import { useEffect, useState } from 'react'
-import { useNavigate, useParams } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
+import { apiUserMemberUrl } from '../api/endpoints'
 import UserTransactionsPanel from '../components/UserTransactionsPanel'
 import type { UserRow } from '../components/UsersTable'
 
 export default function UserDetailPage() {
   const { userId } = useParams<{ userId: string }>()
-  const navigate = useNavigate()
-  const env = import.meta.env as Record<string, string | undefined>
-  const usersUrl = env.VITE_USERS_URL ?? '/users'
-  const userTransactionsBaseUrl = env.VITE_USER_TRANSACTIONS_URL ?? '/transactions/user'
 
   const [user, setUser] = useState<UserRow | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -28,7 +25,7 @@ export default function UserDetailPage() {
       setIsLoading(true)
       setError(null)
       try {
-        const response = await fetch(`${usersUrl}/${encodeURIComponent(userId)}`, {
+        const response = await fetch(apiUserMemberUrl(userId), {
           signal: controller.signal,
         })
         if (!response.ok) {
@@ -73,7 +70,7 @@ export default function UserDetailPage() {
       cancelled = true
       controller.abort()
     }
-  }, [userId, usersUrl])
+  }, [userId])
 
   if (!userId) {
     return null
@@ -87,18 +84,9 @@ export default function UserDetailPage() {
     return (
       <div className="space-y-3">
         <div className="alert alert-error">{error ?? 'User not found'}</div>
-        <button type="button" className="btn btn-outline btn-sm" onClick={() => navigate('/users')}>
-          Back to Users
-        </button>
       </div>
     )
   }
 
-  return (
-    <UserTransactionsPanel
-      user={user}
-      onBack={() => navigate('/users')}
-      transactionsBaseUrl={userTransactionsBaseUrl}
-    />
-  )
+  return <UserTransactionsPanel user={user} />
 }
