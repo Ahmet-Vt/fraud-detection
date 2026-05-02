@@ -57,15 +57,6 @@ export default function UserTransactionsTableCard({
     return transactions.slice(start, start + pageSize)
   }, [transactions, page])
 
-  const distinctCalendarDayCount = useMemo(() => {
-    const keys = new Set<string>()
-    for (const tx of transactions) {
-      const k = localCalendarDayKey(tx.createdAt)
-      if (k) keys.add(k)
-    }
-    return keys.size
-  }, [transactions])
-
   const tableSegments = useMemo(
     () => transactionRowsWithDayBreaks(pagedTransactions),
     [pagedTransactions],
@@ -74,15 +65,7 @@ export default function UserTransactionsTableCard({
   return (
     <div className="card bg-base-100 shadow-md">
       <div className={`card-body ${ui.cardBodyPadding}`}>
-        <div className="flex min-w-0 flex-col gap-1">
-          <h3 className={`card-title ${ui.cardTitleText}`}>Transactions</h3>
-          {!isLoading && transactions.length > 0 && distinctCalendarDayCount > 1 ? (
-            <p className={`${ui.tableCellText} text-base-content/70`}>
-              {distinctCalendarDayCount} calendar days with activity; table rows are grouped by day. The chart shows
-              daily totals.
-            </p>
-          ) : null}
-        </div>
+        <h3 className={`card-title ${ui.cardTitleText}`}>Transactions</h3>
         <div className="mb-3 flex min-w-0 flex-col gap-2 sm:flex-row sm:items-end sm:justify-end">
           <label className="form-control w-full max-w-[14rem] shrink-0">
             <span className={`label py-0 ${ui.tableCellText}`}>

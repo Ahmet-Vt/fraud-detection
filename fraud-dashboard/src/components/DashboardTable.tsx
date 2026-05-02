@@ -1,4 +1,4 @@
-import { useLayoutEffect, useRef } from 'react'
+import { memo, useCallback, useLayoutEffect, useRef } from 'react'
 import { useScreen } from '../config/ScreenContext'
 import { formatLiveDateTime } from '../lib/formatDateTime'
 import type { LiveTransaction } from '../hooks/useLiveTransactions'
@@ -10,7 +10,7 @@ type DashboardTableProps = {
   error?: string | null
 }
 
-export default function DashboardTable({
+function DashboardTable({
   rows,
   connectionMode,
   isLoading = false,
@@ -42,11 +42,14 @@ export default function DashboardTable({
     prevScrollStateRef.current = { top: el.scrollTop, height: el.scrollHeight }
   }, [rows])
 
-  const handleScroll = () => {
+  const handleScroll = useCallback(() => {
     const el = scrollContainerRef.current
     if (!el) return
-    prevScrollStateRef.current.top = el.scrollTop
-  }
+    prevScrollStateRef.current = {
+      ...prevScrollStateRef.current,
+      top: el.scrollTop,
+    }
+  }, [])
 
   return (
     <div className="card bg-base-100 shadow-md">
@@ -113,3 +116,5 @@ export default function DashboardTable({
     </div>
   )
 }
+
+export default memo(DashboardTable)

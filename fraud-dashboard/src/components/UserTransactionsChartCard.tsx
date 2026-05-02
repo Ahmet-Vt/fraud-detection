@@ -70,8 +70,15 @@ export default function UserTransactionsChartCard({
     <div className="card bg-base-100 shadow-md">
       <div className={`card-body ${ui.cardBodyPadding}`}>
         <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between">
-          <h2 className={`card-title min-w-0 truncate ${ui.cardTitleText}`}>
-            {user.name} {user.surname}
+          <h2 className="card-title m-0 min-w-0 max-w-full p-0">
+            <div
+              className={`min-w-0 max-w-full truncate rounded-[8px] px-3 py-2 outline outline-1 -outline-offset-1 outline-base-300 ${ui.cardTitleText}`}
+            >
+              <span className="font-normal text-base-content/70">Username:</span>{' '}
+              <span className="font-semibold">
+                {user.name} {user.surname}
+              </span>
+            </div>
           </h2>
           <span className={`badge badge-error badge-outline shrink-0 ${ui.badgeSize}`}>
             Anomaly Rate: {anomalyRatio.toFixed(2)}%

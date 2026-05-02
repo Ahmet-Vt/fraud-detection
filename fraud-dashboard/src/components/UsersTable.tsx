@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useScreen } from '../config/ScreenContext'
+import { useUsersList } from '../hooks/useUsersList'
 import { formatDateTime } from '../lib/formatDateTime'
 
 type UsersTableProps = {
@@ -19,65 +20,13 @@ export type UserRow = {
 export default function UsersTable({ usersUrl }: UsersTableProps) {
   const navigate = useNavigate()
   const { isMd, ui } = useScreen()
-  const [users, setUsers] = useState<UserRow[]>([])
-  const [isUsersLoading, setIsUsersLoading] = useState(false)
-  const [usersError, setUsersError] = useState<string | null>(null)
+  const { users, isUsersLoading, usersError } = useUsersList(usersUrl)
   const [page, setPage] = useState(1)
   const pageSize = 100
 
   useEffect(() => {
-    let cancelled = false
-    const controller = new AbortController()
-
-    const loadUsers = async () => {
-      setIsUsersLoading(true)
-      setUsersError(null)
-      try {
-        const response = await fetch(usersUrl, { signal: controller.signal })
-        if (!response.ok) {
-          throw new Error(`users request failed with ${response.status}`)
-        }
-
-        const payload = (await response.json()) as Array<{
-          id: string
-          name: string
-          surname: string
-          email?: string
-          status: string
-          created_at: string
-        }>
-
-        if (cancelled) return
-
-        setUsers(
-          payload.map((user) => ({
-            id: user.id,
-            name: user.name,
-            surname: user.surname,
-            email: user.email,
-            status: user.status,
-            createdAt: user.created_at,
-          })),
-        )
-        setPage(1)
-      } catch (err) {
-        if (cancelled) return
-        if (err instanceof DOMException && err.name === 'AbortError') return
-        setUsersError('Could not load users')
-      } finally {
-        if (!cancelled) {
-          setIsUsersLoading(false)
-        }
-      }
-    }
-
-    void loadUsers()
-
-    return () => {
-      cancelled = true
-      controller.abort()
-    }
-  }, [usersUrl])
+    setPage(1)
+  }, [users])
 
   const getStatusBadgeClass = (status: string) => {
     const normalized = status.trim().toLowerCase()

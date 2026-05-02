@@ -319,14 +319,13 @@ export function useLiveTransactions({
   )
 
   const chartTotals = useMemo(() => {
-    return fraudRateSeries.reduce(
-      (acc, point) => {
-        acc.requestCount += point.requestCount
-        acc.fraudCount += point.fraudCount
-        return acc
-      },
-      { requestCount: 0, fraudCount: 0 },
-    )
+    let requestCount = 0
+    let fraudCount = 0
+    for (const point of fraudRateSeries) {
+      requestCount += point.requestCount
+      fraudCount += point.fraudCount
+    }
+    return { requestCount, fraudCount }
   }, [fraudRateSeries])
 
   return {

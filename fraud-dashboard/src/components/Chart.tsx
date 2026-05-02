@@ -7,7 +7,7 @@ import {
   XAxis,
   YAxis,
 } from 'recharts'
-import { useMemo } from 'react'
+import { memo, useMemo } from 'react'
 import { useScreen } from '../config/ScreenContext'
 import type { FraudRatePoint } from '../hooks/useLiveTransactions'
 
@@ -17,7 +17,7 @@ type ChartProps = {
   fraudCount: number
 }
 
-export default function Chart({ data, requestCount, fraudCount }: ChartProps) {
+function Chart({ data, requestCount, fraudCount }: ChartProps) {
   const { isXs, isMd, isSm, ui } = useScreen()
   const chartData = useMemo(() => data.map((point, index) => ({ ...point, pointIndex: index })), [data])
   const xAxisTicks = useMemo(() => {
@@ -31,7 +31,7 @@ export default function Chart({ data, requestCount, fraudCount }: ChartProps) {
       ticks.push(lastTick)
     }
     return ticks
-  }, [chartData.length])
+  }, [chartData])
 
   return (
     <div className="card bg-base-100 shadow-md">
@@ -103,3 +103,5 @@ export default function Chart({ data, requestCount, fraudCount }: ChartProps) {
     </div>
   )
 }
+
+export default memo(Chart)

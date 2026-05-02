@@ -1,8 +1,9 @@
+import { memo } from 'react'
 import Chart from './Chart'
 import DashboardTable from './DashboardTable'
 import type { LiveTransactionsOutletContext } from '../hooks/useLiveTransactions'
 
-export default function LiveDataPanel({
+function LiveDataPanel({
   transactions,
   fraudRateSeries,
   chartTotals,
@@ -26,3 +27,5 @@ export default function LiveDataPanel({
     </>
   )
 }
+
+export default memo(LiveDataPanel)
