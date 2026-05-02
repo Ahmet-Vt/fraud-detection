@@ -38,6 +38,71 @@ type transactionResponse struct {
 
 type TransactionResponse = transactionResponse
 
+type TimeRangeQuery struct {
+	From *time.Time `form:"from" time_format:"2006-01-02T15:04:05Z07:00"`
+	To   *time.Time `form:"to" time_format:"2006-01-02T15:04:05Z07:00"`
+}
+
+type userTransactionTimeBucketQuery struct {
+	TimeRangeQuery
+	Bucket string `form:"bucket"`
+}
+
+func validateBoundTimeRange(fromPtr, toPtr *time.Time) *secureerr.Error {
+	if fromPtr == nil && toPtr == nil {
+		return nil
+	}
+	if fromPtr == nil || toPtr == nil {
+		return secureerr.BadRequest(
+			"INVALID_QUERY",
+			"from and to query parameters must both be provided together",
+			nil,
+			nil,
+		)
+	}
+	if toPtr.Before(*fromPtr) {
+		return secureerr.BadRequest(
+			"INVALID_QUERY",
+			"to must not be before from",
+			nil,
+			nil,
+		)
+	}
+	return nil
+}
+
+func bindTimeRangeQuery(c *gin.Context) (fromPtr, toPtr *time.Time, secErr *secureerr.Error) {
+	var q TimeRangeQuery
+	if err := c.ShouldBindQuery(&q); err != nil {
+		return nil, nil, secureerr.BadRequest(
+			"INVALID_QUERY",
+			"invalid query parameters",
+			err,
+			nil,
+		)
+	}
+	if sec := validateBoundTimeRange(q.From, q.To); sec != nil {
+		return nil, nil, sec
+	}
+	return q.From, q.To, nil
+}
+
+func bindUserTransactionTimeBucketQuery(c *gin.Context) (fromPtr, toPtr *time.Time, bucket string, secErr *secureerr.Error) {
+	var q userTransactionTimeBucketQuery
+	if err := c.ShouldBindQuery(&q); err != nil {
+		return nil, nil, "", secureerr.BadRequest(
+			"INVALID_QUERY",
+			"invalid query parameters",
+			err,
+			nil,
+		)
+	}
+	if sec := validateBoundTimeRange(q.From, q.To); sec != nil {
+		return nil, nil, "", sec
+	}
+	return q.From, q.To, strings.TrimSpace(q.Bucket), nil
+}
+
 func NewHandler(service *Service) *Handler {
 	return &Handler{service: service}
 }
@@ -47,6 +112,7 @@ func (h *Handler) RegisterRoutes(router gin.IRouter) {
 	router.GET("/transactions/:id", h.GetTransactionByID)
 	router.GET("/transactions", h.GetAllTransactions)
 	router.GET("/transactions/user/:id", h.GetTransactionsByUserID)
+	router.GET("/transactions/user/:id/detail", h.GetUserTransactionsDetail)
 	router.GET("/transactions/user/:id/summary", h.GetUserTransactionSummary)
 	router.DELETE("/transactions/:id", h.DeleteTransaction)
 }
@@ -163,50 +229,10 @@ func (h *Handler) GetTransactionsByUserID(c *gin.Context) {
 		return
 	}
 
-	var fromPtr, toPtr *time.Time
-	rawFrom := strings.TrimSpace(c.Query("from"))
-	rawTo := strings.TrimSpace(c.Query("to"))
-	if rawFrom != "" || rawTo != "" {
-		if rawFrom == "" || rawTo == "" {
-			h.writeError(c, secureerr.BadRequest(
-				"INVALID_QUERY",
-				"from and to query parameters must both be provided together",
-				nil,
-				map[string]string{"from": rawFrom, "to": rawTo},
-			))
-			return
-		}
-		parsedFrom, parseErr := time.Parse(time.RFC3339, rawFrom)
-		if parseErr != nil {
-			h.writeError(c, secureerr.BadRequest(
-				"INVALID_FROM",
-				"invalid from value",
-				parseErr,
-				map[string]string{"from": rawFrom},
-			))
-			return
-		}
-		parsedTo, parseErr := time.Parse(time.RFC3339, rawTo)
-		if parseErr != nil {
-			h.writeError(c, secureerr.BadRequest(
-				"INVALID_TO",
-				"invalid to value",
-				parseErr,
-				map[string]string{"to": rawTo},
-			))
-			return
-		}
-		if parsedTo.Before(parsedFrom) {
-			h.writeError(c, secureerr.BadRequest(
-				"INVALID_QUERY",
-				"to must not be before from",
-				nil,
-				map[string]string{"from": rawFrom, "to": rawTo},
-			))
-			return
-		}
-		fromPtr = &parsedFrom
-		toPtr = &parsedTo
+	fromPtr, toPtr, secErr := bindTimeRangeQuery(c)
+	if secErr != nil {
+		h.writeError(c, secErr)
+		return
 	}
 
 	transactions, err := h.service.GetTransactionsByUserID(userID, fromPtr, toPtr)
@@ -226,11 +252,76 @@ type transactionSummaryResponse struct {
 	AmountAvg    float64   `json:"amount_avg"`
 }
 
-// SummaryQueryRequest binds query parameters for GET /transactions/user/:id/summary.
-type SummaryQueryRequest struct {
-	From   *time.Time `form:"from" time_format:"2006-01-02T15:04:05Z07:00"`
-	To     *time.Time `form:"to" time_format:"2006-01-02T15:04:05Z07:00"`
-	Bucket string     `form:"bucket"`
+type userTransactionsDetailResponse struct {
+	Transactions []transactionResponse        `json:"transactions"`
+	Summary      []transactionSummaryResponse `json:"summary"`
+}
+
+func bucketSummariesToResponses(summary []UserTransactionBucketSummary) []transactionSummaryResponse {
+	response := make([]transactionSummaryResponse, 0, len(summary))
+	for _, item := range summary {
+		response = append(response, transactionSummaryResponse{
+			BucketStart:  item.BucketStart,
+			RequestCount: item.RequestCount,
+			AnomalyCount: item.AnomalyCount,
+			AmountSum:    item.AmountSum,
+			AmountAvg:    item.AmountAvg,
+		})
+	}
+	return response
+}
+
+// GetUserTransactionsDetail godoc
+// @Summary List user transactions with summary
+// @Description Returns transactions and bucket summary in one response (same filters as separate list/summary calls). Default bucket is day when omitted.
+// @Tags transactions
+// @Produce json
+// @Param id path string true "User ID"
+// @Param from query string false "Range start RFC3339 (omit with to for all-time)"
+// @Param to query string false "Range end RFC3339 (omit with from for all-time)"
+// @Param bucket query string false "Bucket unit: minute|hour|day (default day)"
+// @Success 200 {object} transaction.userTransactionsDetailResponse
+// @Failure 400 {object} apidoc.InvalidUserIDError
+// @Failure 500 {object} apidoc.InternalServerError
+// @Router /transactions/user/{id}/detail [get]
+func (h *Handler) GetUserTransactionsDetail(c *gin.Context) {
+	userID, err := uuid.Parse(c.Param("id"))
+	if err != nil {
+		h.writeError(c, secureerr.BadRequest(
+			"INVALID_USER_ID",
+			"invalid user id",
+			err,
+			map[string]string{"user_id": c.Param("id")},
+		))
+		return
+	}
+
+	fromPtr, toPtr, bucket, secErr := bindUserTransactionTimeBucketQuery(c)
+	if secErr != nil {
+		h.writeError(c, secErr)
+		return
+	}
+
+	if bucket == "" {
+		bucket = "day"
+	}
+
+	transactions, err := h.service.GetTransactionsByUserID(userID, fromPtr, toPtr)
+	if err != nil {
+		h.writeError(c, h.mapError(err))
+		return
+	}
+
+	summary, err := h.service.GetUserTransactionSummary(userID, fromPtr, toPtr, bucket)
+	if err != nil {
+		h.writeError(c, h.mapError(err))
+		return
+	}
+
+	c.JSON(http.StatusOK, userTransactionsDetailResponse{
+		Transactions: toTransactionResponses(transactions),
+		Summary:      bucketSummariesToResponses(summary),
+	})
 }
 
 // GetUserTransactionSummary godoc
@@ -258,35 +349,19 @@ func (h *Handler) GetUserTransactionSummary(c *gin.Context) {
 		return
 	}
 
-	var q SummaryQueryRequest
-	if err := c.ShouldBindQuery(&q); err != nil {
-		h.writeError(c, secureerr.BadRequest(
-			"INVALID_QUERY",
-			"invalid query parameters",
-			err,
-			nil,
-		))
+	fromPtr, toPtr, bucket, secErr := bindUserTransactionTimeBucketQuery(c)
+	if secErr != nil {
+		h.writeError(c, secErr)
 		return
 	}
 
-	summary, err := h.service.GetUserTransactionSummary(userID, q.From, q.To, q.Bucket)
+	summary, err := h.service.GetUserTransactionSummary(userID, fromPtr, toPtr, bucket)
 	if err != nil {
 		h.writeError(c, h.mapError(err))
 		return
 	}
 
-	response := make([]transactionSummaryResponse, 0, len(summary))
-	for _, item := range summary {
-		response = append(response, transactionSummaryResponse{
-			BucketStart:  item.BucketStart,
-			RequestCount: item.RequestCount,
-			AnomalyCount: item.AnomalyCount,
-			AmountSum:    item.AmountSum,
-			AmountAvg:    item.AmountAvg,
-		})
-	}
-
-	c.JSON(http.StatusOK, response)
+	c.JSON(http.StatusOK, bucketSummariesToResponses(summary))
 }
 
 // DeleteTransaction godoc
