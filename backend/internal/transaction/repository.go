@@ -17,7 +17,7 @@ type RepositoryInterface interface {
 	UpdateStatus(transactionID uuid.UUID, status domain.Status) error
 	FindByID(id uuid.UUID) (*domain.Transaction, error)
 	FindAll() ([]*domain.Transaction, error)
-	FindByUserID(userID uuid.UUID) ([]*domain.Transaction, error)
+	FindByUserID(userID uuid.UUID, from *time.Time, to *time.Time) ([]*domain.Transaction, error)
 	GetUserTransactionSummary(
 		userID uuid.UUID,
 		from time.Time,
@@ -132,9 +132,16 @@ func (r *Repository) FindAll() ([]*domain.Transaction, error) {
 	return transactions, nil
 }
 
-func (r *Repository) FindByUserID(userID uuid.UUID) ([]*domain.Transaction, error) {
+func (r *Repository) FindByUserID(userID uuid.UUID, from *time.Time, to *time.Time) ([]*domain.Transaction, error) {
 	var transactions []*domain.Transaction
-	if err := r.db.Preload("FraudRules").Where("user_id = ?", userID).Find(&transactions).Error; err != nil {
+	q := r.db.Preload("FraudRules").Where("user_id = ?", userID)
+	if from != nil {
+		q = q.Where("created_at >= ?", *from)
+	}
+	if to != nil {
+		q = q.Where("created_at <= ?", *to)
+	}
+	if err := q.Order("created_at DESC").Find(&transactions).Error; err != nil {
 		return nil, fmt.Errorf("find transactions by user id: %w", err)
 	}
 	return transactions, nil

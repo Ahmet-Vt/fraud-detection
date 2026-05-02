@@ -33,6 +33,7 @@ type transactionResponse struct {
 	Location          string        `json:"location" example:"Istanbul" extensions:"x-order=3"`
 	TransactionStatus domain.Status `json:"transaction_status" enums:"pending,completed,failed" example:"pending" extensions:"x-order=4"`
 	FraudStatus       bool          `json:"fraud_status" example:"false" extensions:"x-order=5"`
+	CreatedAt         time.Time     `json:"created_at" swaggertype:"string" format:"date-time" example:"2026-05-02T12:00:00Z" extensions:"x-order=6"`
 }
 
 type TransactionResponse = transactionResponse
@@ -140,10 +141,12 @@ func (h *Handler) GetAllTransactions(c *gin.Context) {
 
 // GetTransactionsByUserID godoc
 // @Summary List transactions by user
-// @Description Returns transactions for a specific user UUID.
+// @Description Returns transactions for a specific user UUID. Optional from/to (RFC3339) filter on created_at; both must be sent together.
 // @Tags transactions
 // @Produce json
 // @Param id path string true "User ID"
+// @Param from query string false "Range start RFC3339 (omit with to for all-time list)"
+// @Param to query string false "Range end RFC3339 (omit with from for all-time list)"
 // @Success 200 {array} TransactionResponse
 // @Failure 400 {object} apidoc.InvalidUserIDError
 // @Failure 500 {object} apidoc.InternalServerError
@@ -160,7 +163,53 @@ func (h *Handler) GetTransactionsByUserID(c *gin.Context) {
 		return
 	}
 
-	transactions, err := h.service.GetTransactionsByUserID(userID)
+	var fromPtr, toPtr *time.Time
+	rawFrom := strings.TrimSpace(c.Query("from"))
+	rawTo := strings.TrimSpace(c.Query("to"))
+	if rawFrom != "" || rawTo != "" {
+		if rawFrom == "" || rawTo == "" {
+			h.writeError(c, secureerr.BadRequest(
+				"INVALID_QUERY",
+				"from and to query parameters must both be provided together",
+				nil,
+				map[string]string{"from": rawFrom, "to": rawTo},
+			))
+			return
+		}
+		parsedFrom, parseErr := time.Parse(time.RFC3339, rawFrom)
+		if parseErr != nil {
+			h.writeError(c, secureerr.BadRequest(
+				"INVALID_FROM",
+				"invalid from value",
+				parseErr,
+				map[string]string{"from": rawFrom},
+			))
+			return
+		}
+		parsedTo, parseErr := time.Parse(time.RFC3339, rawTo)
+		if parseErr != nil {
+			h.writeError(c, secureerr.BadRequest(
+				"INVALID_TO",
+				"invalid to value",
+				parseErr,
+				map[string]string{"to": rawTo},
+			))
+			return
+		}
+		if parsedTo.Before(parsedFrom) {
+			h.writeError(c, secureerr.BadRequest(
+				"INVALID_QUERY",
+				"to must not be before from",
+				nil,
+				map[string]string{"from": rawFrom, "to": rawTo},
+			))
+			return
+		}
+		fromPtr = &parsedFrom
+		toPtr = &parsedTo
+	}
+
+	transactions, err := h.service.GetTransactionsByUserID(userID, fromPtr, toPtr)
 	if err != nil {
 		h.writeError(c, h.mapError(err))
 		return
@@ -177,15 +226,22 @@ type transactionSummaryResponse struct {
 	AmountAvg    float64   `json:"amount_avg"`
 }
 
+// SummaryQueryRequest binds query parameters for GET /transactions/user/:id/summary.
+type SummaryQueryRequest struct {
+	From   *time.Time `form:"from" time_format:"2006-01-02T15:04:05Z07:00"`
+	To     *time.Time `form:"to" time_format:"2006-01-02T15:04:05Z07:00"`
+	Bucket string     `form:"bucket"`
+}
+
 // GetUserTransactionSummary godoc
 // @Summary Get user transaction summary
 // @Description Returns bucket-based transaction aggregates for a user.
 // @Tags transactions
 // @Produce json
 // @Param id path string true "User ID"
-// @Param from query string false "Range start in RFC3339 (default: now-24h)"
-// @Param to query string false "Range end in RFC3339 (default: now)"
-// @Param bucket query string false "Bucket unit: minute|hour|day (default: minute)"
+// @Param from query string false "Range start in RFC3339 (omit with to for all-time summary)"
+// @Param to query string false "Range end in RFC3339 (omit with from for all-time summary)"
+// @Param bucket query string false "Bucket unit: minute|hour|day (empty: day for all-time, minute when from/to set)"
 // @Success 200 {array} transaction.transactionSummaryResponse
 // @Failure 400 {object} apidoc.InvalidUserIDError
 // @Failure 500 {object} apidoc.InternalServerError
@@ -202,47 +258,19 @@ func (h *Handler) GetUserTransactionSummary(c *gin.Context) {
 		return
 	}
 
-	now := time.Now().UTC()
-	from := now.Add(-24 * time.Hour)
-	to := now
-	bucket := "minute"
-
-	if rawFrom := strings.TrimSpace(c.Query("from")); rawFrom != "" {
-		parsedFrom, parseErr := time.Parse(time.RFC3339, rawFrom)
-		if parseErr != nil {
-			h.writeError(c, secureerr.BadRequest(
-				"INVALID_FROM",
-				"invalid from value",
-				parseErr,
-				map[string]string{"from": rawFrom},
-			))
-			return
-		}
-		from = parsedFrom
-	}
-	if rawTo := strings.TrimSpace(c.Query("to")); rawTo != "" {
-		parsedTo, parseErr := time.Parse(time.RFC3339, rawTo)
-		if parseErr != nil {
-			h.writeError(c, secureerr.BadRequest(
-				"INVALID_TO",
-				"invalid to value",
-				parseErr,
-				map[string]string{"to": rawTo},
-			))
-			return
-		}
-		to = parsedTo
-	}
-	if rawBucket := strings.TrimSpace(c.Query("bucket")); rawBucket != "" {
-		bucket = rawBucket
+	var q SummaryQueryRequest
+	if err := c.ShouldBindQuery(&q); err != nil {
+		h.writeError(c, secureerr.BadRequest(
+			"INVALID_QUERY",
+			"invalid query parameters",
+			err,
+			nil,
+		))
+		return
 	}
 
-	summary, err := h.service.GetUserTransactionSummary(userID, from, to, bucket)
+	summary, err := h.service.GetUserTransactionSummary(userID, q.From, q.To, q.Bucket)
 	if err != nil {
-		if strings.Contains(err.Error(), "invalid time range") || strings.Contains(err.Error(), "invalid bucket") {
-			h.writeError(c, secureerr.BadRequest("INVALID_QUERY", err.Error(), err, nil))
-			return
-		}
 		h.writeError(c, h.mapError(err))
 		return
 	}
@@ -302,6 +330,12 @@ func (h *Handler) mapError(err error) error {
 	if errors.Is(err, ErrUserNotExists) {
 		return secureerr.BadRequest("USER_NOT_EXISTS", "referenced user does not exist", err, nil)
 	}
+	if errors.Is(err, ErrInvalidTimeRange) {
+		return secureerr.BadRequest("INVALID_QUERY", "invalid time range", err, nil)
+	}
+	if errors.Is(err, ErrInvalidBucket) {
+		return secureerr.BadRequest("INVALID_QUERY", "invalid bucket", err, nil)
+	}
 	return secureerr.FromError(err)
 }
 
@@ -327,6 +361,7 @@ func toTransactionResponse(transaction *domain.Transaction) transactionResponse 
 		Location:          transaction.Location,
 		TransactionStatus: transaction.TransactionStatus,
 		FraudStatus:       transaction.FraudStatus,
+		CreatedAt:         transaction.CreatedAt,
 	}
 }
 

@@ -129,8 +129,15 @@ func (s *Service) GetAllTransactions() ([]*domain.Transaction, error) {
 	return transactions, nil
 }
 
-func (s *Service) GetTransactionsByUserID(userID uuid.UUID) ([]*domain.Transaction, error) {
-	transactions, err := s.repository.FindByUserID(userID)
+func (s *Service) GetTransactionsByUserID(userID uuid.UUID, from *time.Time, to *time.Time) ([]*domain.Transaction, error) {
+	if (from == nil) != (to == nil) {
+		return nil, fmt.Errorf("get transactions by user id: %w", ErrInvalidTimeRange)
+	}
+	if from != nil && to.Before(*from) {
+		return nil, fmt.Errorf("get transactions by user id: %w", ErrInvalidTimeRange)
+	}
+
+	transactions, err := s.repository.FindByUserID(userID, from, to)
 	if err != nil {
 		return nil, fmt.Errorf("get transactions by user id: %w", err)
 	}
@@ -140,22 +147,44 @@ func (s *Service) GetTransactionsByUserID(userID uuid.UUID) ([]*domain.Transacti
 
 func (s *Service) GetUserTransactionSummary(
 	userID uuid.UUID,
-	from time.Time,
-	to time.Time,
+	from *time.Time,
+	to *time.Time,
 	bucket string,
 ) ([]UserTransactionBucketSummary, error) {
-	if to.Before(from) {
-		return nil, fmt.Errorf("get user transaction summary: invalid time range")
+	if (from == nil) != (to == nil) {
+		return nil, fmt.Errorf("get user transaction summary: %w", ErrInvalidTimeRange)
+	}
+
+	now := time.Now().UTC()
+	var effFrom, effTo time.Time
+	allTime := from == nil && to == nil
+	if allTime {
+		effFrom = time.Unix(0, 0).UTC()
+		effTo = now
+	} else {
+		effFrom = *from
+		effTo = *to
+		if effTo.Before(effFrom) {
+			return nil, fmt.Errorf("get user transaction summary: %w", ErrInvalidTimeRange)
+		}
 	}
 
 	normalizedBucket := strings.ToLower(strings.TrimSpace(bucket))
+	if normalizedBucket == "" {
+		if allTime {
+			normalizedBucket = "day"
+		} else {
+			normalizedBucket = "minute"
+		}
+	}
+
 	switch normalizedBucket {
 	case "minute", "hour", "day":
 	default:
-		return nil, fmt.Errorf("get user transaction summary: invalid bucket %q", bucket)
+		return nil, fmt.Errorf("get user transaction summary: invalid bucket %q: %w", bucket, ErrInvalidBucket)
 	}
 
-	summary, err := s.repository.GetUserTransactionSummary(userID, from, to, normalizedBucket)
+	summary, err := s.repository.GetUserTransactionSummary(userID, effFrom, effTo, normalizedBucket)
 	if err != nil {
 		return nil, fmt.Errorf("get user transaction summary: %w", err)
 	}
