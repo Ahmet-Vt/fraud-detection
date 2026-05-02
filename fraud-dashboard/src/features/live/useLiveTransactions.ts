@@ -47,6 +47,7 @@ function createInitialFraudRateSeries(now = Date.now()): FraudRatePoint[] {
 type UseLiveTransactionsOptions = {
   sseUrl?: string
   maxItems?: number
+  onFraudTransaction?: (tx: LiveTransaction) => void
 }
 
 type SseEvaluatedTransactionPayload = {
@@ -140,7 +141,12 @@ function prependUnique(
 export function useLiveTransactions({
   sseUrl,
   maxItems = 100,
+  onFraudTransaction,
 }: UseLiveTransactionsOptions) {
+  const onFraudTransactionRef = useRef(onFraudTransaction)
+  onFraudTransactionRef.current = onFraudTransaction
+  const seenFraudNotifyIdsRef = useRef(new Set<string>())
+
   const [transactions, setTransactions] = useState<LiveTransaction[]>([])
   const [fraudRateSeries, setFraudRateSeries] = useState<FraudRatePoint[]>(() =>
     createInitialFraudRateSeries(),
@@ -236,6 +242,12 @@ export function useLiveTransactions({
           : parsed
       const normalized = normalizePayload(payload)
       if (normalized.length > 0) {
+        for (const tx of normalized) {
+          if (tx.fraudstatus && !seenFraudNotifyIdsRef.current.has(tx.id)) {
+            seenFraudNotifyIdsRef.current.add(tx.id)
+            onFraudTransactionRef.current?.(tx)
+          }
+        }
         minuteBufferRef.current.push(...normalized)
         setTransactions((prev) => prependUnique(normalized, prev, maxItems))
       }

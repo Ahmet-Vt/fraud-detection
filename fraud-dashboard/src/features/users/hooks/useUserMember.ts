@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { apiUserMemberUrl } from '../api/endpoints'
-import type { UserRow } from '../components/UsersTable'
+import { apiUserMemberUrl } from '../../../api/endpoints'
+import type { UserRow } from '../userTypes'
 
 export function useUserMember(userId: string | undefined) {
   const [user, setUser] = useState<UserRow | null>(null)

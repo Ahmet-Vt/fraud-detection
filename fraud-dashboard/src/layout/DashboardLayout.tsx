@@ -1,18 +1,47 @@
-import { Outlet } from 'react-router-dom'
+import { useCallback, useState } from 'react'
+import { Outlet, useNavigate } from 'react-router-dom'
 import { apiSseLiveTransactionsUrl } from '../api/endpoints'
-import Sidebar from '../components/Sidebar'
 import { useScreen } from '../config/ScreenContext'
-import { useLiveTransactions } from '../hooks/useLiveTransactions'
+import { useLiveTransactions, type LiveTransaction } from '../features/live/useLiveTransactions'
+import AnomalyInboxFab, { type AnomalyInboxItem } from './AnomalyInboxFab'
+import Sidebar from './Sidebar'
+
+const liveTransactionMaxItems = 100
+const anomalyInboxMaxItems = 300
+
+function anomalyInboxUserLabel(tx: LiveTransaction): string {
+  return [tx.userName, tx.userSurname].filter(Boolean).join(' ').trim() || 'unknown user'
+}
 
 export default function DashboardLayout() {
   const { isMd, ui } = useScreen()
+  const navigate = useNavigate()
+  const [anomalyItems, setAnomalyItems] = useState<AnomalyInboxItem[]>([])
+
+  const onFraudTransaction = useCallback((tx: LiveTransaction) => {
+    setAnomalyItems((prev) =>
+      [{ id: tx.id, userId: tx.userid, userLabel: anomalyInboxUserLabel(tx) }, ...prev].slice(
+        0,
+        anomalyInboxMaxItems,
+      ),
+    )
+  }, [])
+
+  const onAnomalyRowClick = useCallback(
+    (item: AnomalyInboxItem) => {
+      navigate(`/users/${encodeURIComponent(item.userId)}`)
+    },
+    [navigate],
+  )
+
   const live = useLiveTransactions({
     sseUrl: apiSseLiveTransactionsUrl,
-    maxItems: 100,
+    maxItems: liveTransactionMaxItems,
+    onFraudTransaction,
   })
 
   return (
-    <main className="min-h-screen overflow-x-hidden bg-base-200">
+    <main className="relative min-h-screen overflow-x-hidden bg-base-200">
       <div className="flex min-h-screen w-full min-w-0">
         {!isMd && (
           <Sidebar
@@ -43,6 +72,7 @@ export default function DashboardLayout() {
           </div>
         </div>
       </div>
+      <AnomalyInboxFab items={anomalyItems} onRowClick={onAnomalyRowClick} />
     </main>
   )
 }

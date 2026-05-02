@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import type { UserRow } from '../components/UsersTable'
+import type { UserRow } from '../userTypes'
 
 export function useUsersList(usersUrl: string) {
   const [users, setUsers] = useState<UserRow[]>([])

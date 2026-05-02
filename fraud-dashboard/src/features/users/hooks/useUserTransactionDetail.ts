@@ -1,11 +1,11 @@
 import { useEffect, useState } from 'react'
-import { apiUserTransactionDetailUrl } from '../api/endpoints'
+import { apiUserTransactionDetailUrl } from '../../../api/endpoints'
 import {
   userDetailDateRangeQuery,
   type DailySummaryPoint,
   type DateRangePreset,
   type UserTransaction,
-} from '../components/userDetailTransactions'
+} from '../userDetailTransactions'
 
 export function useUserTransactionDetail(userId: string, datePreset: DateRangePreset) {
   const [transactions, setTransactions] = useState<UserTransaction[]>([])
@@ -14,6 +14,14 @@ export function useUserTransactionDetail(userId: string, datePreset: DateRangePr
   const [error, setError] = useState<string | null>(null)
 
   useEffect(() => {
+    if (!userId) {
+      setTransactions([])
+      setDailySummary([])
+      setIsLoading(false)
+      setError(null)
+      return
+    }
+
     let cancelled = false
     const controller = new AbortController()
 

@@ -1,6 +1,42 @@
+import { useMemo, useState } from 'react'
 import { useParams } from 'react-router-dom'
-import UserTransactionsPanel from '../components/UserTransactionsPanel'
-import { useUserMember } from '../hooks/useUserMember'
+import { useScreen } from '../config/ScreenContext'
+import UserTransactionsChartCard from '../features/users/UserTransactionsChartCard'
+import UserTransactionsTableCard from '../features/users/UserTransactionsTableCard'
+import type { DateRangePreset } from '../features/users/userDetailTransactions'
+import type { UserRow } from '../features/users/userTypes'
+import { useUserMember } from '../features/users/hooks/useUserMember'
+import { useUserTransactionDetail } from '../features/users/hooks/useUserTransactionDetail'
+
+function UserDetailTransactionsBody({ user }: { user: UserRow }) {
+  const { ui } = useScreen()
+  const [datePreset, setDatePreset] = useState<DateRangePreset>('all')
+  const { transactions, dailySummary, isLoading, error } = useUserTransactionDetail(user.id, datePreset)
+
+  const anomalyCount = useMemo(
+    () => transactions.reduce((acc, tx) => acc + (tx.fraudStatus ? 1 : 0), 0),
+    [transactions],
+  )
+  const anomalyRatio = transactions.length === 0 ? 0 : (anomalyCount / transactions.length) * 100
+
+  return (
+    <div className={`space-y-3 ${ui.stackGap}`}>
+      <UserTransactionsChartCard
+        user={user}
+        dailySummary={dailySummary}
+        anomalyRatio={anomalyRatio}
+        isLoading={isLoading}
+        error={error}
+      />
+      <UserTransactionsTableCard
+        transactions={transactions}
+        datePreset={datePreset}
+        onDatePresetChange={setDatePreset}
+        isLoading={isLoading}
+      />
+    </div>
+  )
+}
 
 export default function UserDetailPage() {
   const { userId } = useParams<{ userId: string }>()
@@ -22,5 +58,5 @@ export default function UserDetailPage() {
     )
   }
 
-  return <UserTransactionsPanel user={user} />
+  return <UserDetailTransactionsBody user={user} />
 }

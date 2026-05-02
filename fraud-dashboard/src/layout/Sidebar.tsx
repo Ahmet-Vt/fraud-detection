@@ -90,15 +90,22 @@ export default function Sidebar({
       <h2 className="mb-4 text-lg font-semibold">Menu</h2>
       <NavButtons />
       <div className="mt-6 flex w-full flex-col gap-1 text-sm">
-        <div className="badge flex h-auto min-h-0 w-full justify-start border-0 bg-black px-2 py-2 font-normal text-white whitespace-normal">
-          Mode: {connectionMode}
-        </div>
-        <div className="badge flex h-auto min-h-0 w-full justify-start border-0 bg-black px-2 py-2 font-normal text-white whitespace-normal">
-          Requests: {requestCount}
-        </div>
-        <div className="badge flex h-auto min-h-0 w-full justify-start border-0 bg-red-500 px-2 py-2 font-normal text-white whitespace-normal">
-          Fraud: {fraudCount}
-        </div>
+        {(
+          [
+            { label: 'Mode', value: connectionMode, tone: 'neutral' as const },
+            { label: 'Requests', value: requestCount, tone: 'neutral' as const },
+            { label: 'Fraud', value: fraudCount, tone: 'danger' as const },
+          ] as const
+        ).map((row) => (
+          <div
+            key={row.label}
+            className={`badge flex h-auto min-h-0 w-full justify-start border-0 px-2 py-2 font-normal text-white whitespace-normal ${
+              row.tone === 'danger' ? 'bg-red-500' : 'bg-black'
+            }`}
+          >
+            {row.label}: {row.value}
+          </div>
+        ))}
       </div>
     </aside>
   )

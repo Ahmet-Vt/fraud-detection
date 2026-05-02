@@ -1,5 +1,6 @@
-import UsersListPanel from '../components/UsersListPanel'
+import { apiUsersCollectionUrl } from '../api/endpoints'
+import UsersTable from '../features/users/UsersTable'
 
 export default function UsersListPage() {
-  return <UsersListPanel />
+  return <UsersTable usersUrl={apiUsersCollectionUrl} />
 }
