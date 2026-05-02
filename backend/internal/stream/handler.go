@@ -33,11 +33,9 @@ func (h *Handler) StreamTransactions(c *gin.Context) {
 
 	stream := h.hub.Subscribe(c.Request.Context())
 
-	// Reconnection hint for EventSource (milliseconds). Clients may still apply their own backoff.
 	fmt.Fprint(c.Writer, "retry: 2000\n\n")
 	c.Writer.Flush()
 
-	// Send a lightweight ready event so the client can switch mode immediately.
 	fmt.Fprint(c.Writer, "event: ready\n")
 	fmt.Fprint(c.Writer, "data: {}\n\n")
 	c.Writer.Flush()
