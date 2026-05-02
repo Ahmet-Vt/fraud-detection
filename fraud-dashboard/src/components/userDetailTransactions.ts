@@ -1,5 +1,21 @@
 export type DateRangePreset = 'today' | 'weekly' | 'monthly' | 'yearly' | 'all'
 
+export type UserTransaction = {
+  id: string
+  amount: number
+  location: string
+  fraudStatus: boolean
+  createdAt: string
+}
+
+export type DailySummaryPoint = {
+  bucketStart: string
+  requestCount: number
+  anomalyCount: number
+  amountSum: number
+  amountAvg: number
+}
+
 export function userDetailDateRangeQuery(preset: DateRangePreset): string {
   if (preset === 'all') return ''
 

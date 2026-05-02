@@ -32,3 +32,13 @@ export function apiUserTransactionSummaryUrl(
   const base = baseUrl.replace(/\/$/, '')
   return `${base}/${encodeURIComponent(userId)}/summary${q ? `?${q}` : ''}`
 }
+
+export function apiUserTransactionDetailUrl(
+  userId: string,
+  query: string,
+  baseUrl: string = apiUserTransactionsBaseUrl,
+): string {
+  const q = query.startsWith('?') ? query.slice(1) : query
+  const base = baseUrl.replace(/\/$/, '')
+  return `${base}/${encodeURIComponent(userId)}/detail${q ? `?${q}` : ''}`
+}

@@ -49,18 +49,7 @@ type UseLiveTransactionsOptions = {
   maxItems?: number
 }
 
-type BackendTransaction = {
-  id: string
-  user_id: string
-  user_name?: string
-  user_surname?: string
-  amount: number
-  location: string
-  fraud_status: boolean
-  created_at: string
-}
-
-type BackendEvaluatedTransaction = {
+type SseEvaluatedTransactionPayload = {
   transaction_id: string
   user_id: string
   user_name: string
@@ -71,20 +60,7 @@ type BackendEvaluatedTransaction = {
   created_at: string
 }
 
-function mapBackendTransaction(tx: BackendTransaction): LiveTransaction {
-  return {
-    id: tx.id,
-    userid: tx.user_id,
-    userName: tx.user_name ?? '',
-    userSurname: tx.user_surname ?? '',
-    amount: tx.amount,
-    location: tx.location,
-    fraudstatus: tx.fraud_status,
-    createdat: tx.created_at,
-  }
-}
-
-function mapBackendEvaluatedTransaction(tx: BackendEvaluatedTransaction): LiveTransaction {
+function mapSseEvaluatedTransaction(tx: SseEvaluatedTransactionPayload): LiveTransaction {
   return {
     id: tx.transaction_id,
     userid: tx.user_id,
@@ -97,22 +73,7 @@ function mapBackendEvaluatedTransaction(tx: BackendEvaluatedTransaction): LiveTr
   }
 }
 
-function isBackendTransaction(value: unknown): value is BackendTransaction {
-  if (!value || typeof value !== 'object') return false
-  const v = value as Record<string, unknown>
-  return (
-    typeof v.id === 'string' &&
-    typeof v.user_id === 'string' &&
-    (typeof v.user_name === 'string' || typeof v.user_name === 'undefined') &&
-    (typeof v.user_surname === 'string' || typeof v.user_surname === 'undefined') &&
-    typeof v.amount === 'number' &&
-    typeof v.location === 'string' &&
-    typeof v.fraud_status === 'boolean' &&
-    typeof v.created_at === 'string'
-  )
-}
-
-function isBackendEvaluatedTransaction(value: unknown): value is BackendEvaluatedTransaction {
+function isSseEvaluatedTransactionPayload(value: unknown): value is SseEvaluatedTransactionPayload {
   if (!value || typeof value !== 'object') return false
   const v = value as Record<string, unknown>
   return (
@@ -151,12 +112,8 @@ function normalizePayload(input: unknown): LiveTransaction[] {
       mapped.push(item)
       continue
     }
-    if (isBackendTransaction(item)) {
-      mapped.push(mapBackendTransaction(item))
-      continue
-    }
-    if (isBackendEvaluatedTransaction(item)) {
-      mapped.push(mapBackendEvaluatedTransaction(item))
+    if (isSseEvaluatedTransactionPayload(item)) {
+      mapped.push(mapSseEvaluatedTransaction(item))
     }
   }
 
