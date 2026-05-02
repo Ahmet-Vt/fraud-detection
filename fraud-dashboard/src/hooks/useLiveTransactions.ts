@@ -23,6 +23,9 @@ export type FraudRatePoint = {
 const chartBucketMs = 15000
 const chartWindowPoints = 240
 
+const sseReconnectBaseMs = 1000
+const sseReconnectMaxMs = 60_000
+
 function formatBucketLabel(date: Date): string {
   return date.toLocaleTimeString([], {
     hour: '2-digit',
@@ -231,33 +234,78 @@ export function useLiveTransactions({
   }, [])
 
   useEffect(() => {
-    let source: EventSource | null = null
-    let unmounted = false
+    if (!sseUrl) {
+      setConnectionMode('disconnected')
+      setError('sse url is not configured')
+      setIsLoading(false)
+      return
+    }
 
-    if (sseUrl) {
+    let unmounted = false
+    let source: EventSource | null = null
+    let reconnectTimer: ReturnType<typeof window.setTimeout> | null = null
+    let reconnectAttempt = 0
+
+    const resetReconnectBackoff = () => {
+      reconnectAttempt = 0
+    }
+
+    const nextReconnectDelayMs = () => {
+      const exp = Math.min(sseReconnectMaxMs, sseReconnectBaseMs * 2 ** reconnectAttempt)
+      reconnectAttempt += 1
+      const jitterRange = Math.max(1, Math.floor(exp * 0.25))
+      return exp + Math.floor(Math.random() * jitterRange)
+    }
+
+    const clearReconnectTimer = () => {
+      if (reconnectTimer != null) {
+        window.clearTimeout(reconnectTimer)
+        reconnectTimer = null
+      }
+    }
+
+    const markConnected = () => {
+      if (unmounted) return
+      resetReconnectBackoff()
+      setConnectionMode('sse')
+      setIsLoading(false)
+      setError(null)
+    }
+
+    const handlePayload = (raw: string) => {
+      const parsed = JSON.parse(raw) as unknown
+      const payload =
+        parsed &&
+        typeof parsed === 'object' &&
+        'data' in (parsed as Record<string, unknown>)
+          ? (parsed as Record<string, unknown>).data
+          : parsed
+      const normalized = normalizePayload(payload)
+      if (normalized.length > 0) {
+        minuteBufferRef.current.push(...normalized)
+        setTransactions((prev) => prependUnique(normalized, prev, maxItems))
+      }
+    }
+
+    const scheduleReconnect = () => {
+      if (unmounted || reconnectTimer != null) return
+      const wait = nextReconnectDelayMs()
+      reconnectTimer = window.setTimeout(() => {
+        reconnectTimer = null
+        connect()
+      }, wait)
+    }
+
+    const connect = () => {
+      if (unmounted) return
+      source?.close()
+      source = null
+
       try {
         source = new EventSource(sseUrl)
 
-        const handlePayload = (raw: string) => {
-          const parsed = JSON.parse(raw) as unknown
-          const payload =
-            parsed &&
-            typeof parsed === 'object' &&
-            'data' in (parsed as Record<string, unknown>)
-              ? (parsed as Record<string, unknown>).data
-              : parsed
-          const normalized = normalizePayload(payload)
-          if (normalized.length > 0) {
-            minuteBufferRef.current.push(...normalized)
-            setTransactions((prev) => prependUnique(normalized, prev, maxItems))
-          }
-        }
-
         source.onopen = () => {
-          if (unmounted) return
-          setConnectionMode('sse')
-          setIsLoading(false)
-          setError(null)
+          markConnected()
         }
         source.onmessage = (event) => {
           if (unmounted) return
@@ -277,31 +325,31 @@ export function useLiveTransactions({
           }
         })
         source.addEventListener('ready', () => {
-          if (unmounted) return
-          setConnectionMode('sse')
-          setIsLoading(false)
-          setError(null)
+          markConnected()
         })
         source.onerror = () => {
-          if (unmounted) return
           source?.close()
+          source = null
+          if (unmounted) return
           setConnectionMode('disconnected')
           setError('sse connection lost')
           setIsLoading(false)
+          scheduleReconnect()
         }
       } catch {
+        if (unmounted) return
         setConnectionMode('disconnected')
         setError('sse initialization failed')
         setIsLoading(false)
+        scheduleReconnect()
       }
-    } else {
-      setConnectionMode('disconnected')
-      setError('sse url is not configured')
-      setIsLoading(false)
     }
+
+    connect()
 
     return () => {
       unmounted = true
+      clearReconnectTimer()
       source?.close()
     }
   }, [sseUrl, maxItems])
@@ -336,3 +384,5 @@ export function useLiveTransactions({
     error,
   }
 }
+
+export type LiveTransactionsOutletContext = ReturnType<typeof useLiveTransactions>
