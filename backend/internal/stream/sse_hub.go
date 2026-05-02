@@ -9,19 +9,26 @@ import (
 	"fraud-detection/internal/transaction"
 )
 
+const sseClientBuffer = 256
+
+type SseEnvelope struct {
+	Event   string
+	Payload []byte
+}
+
 type SSEHub struct {
 	mu      sync.RWMutex
-	clients map[chan []byte]struct{}
+	clients map[chan SseEnvelope]struct{}
 }
 
 func NewSSEHub() *SSEHub {
 	return &SSEHub{
-		clients: make(map[chan []byte]struct{}),
+		clients: make(map[chan SseEnvelope]struct{}),
 	}
 }
 
-func (h *SSEHub) Subscribe(ctx context.Context) <-chan []byte {
-	ch := make(chan []byte, 16)
+func (h *SSEHub) Subscribe(ctx context.Context) <-chan SseEnvelope {
+	ch := make(chan SseEnvelope, sseClientBuffer)
 
 	h.mu.Lock()
 	h.clients[ch] = struct{}{}
@@ -40,6 +47,21 @@ func (h *SSEHub) Subscribe(ctx context.Context) <-chan []byte {
 	return ch
 }
 
+func (h *SSEHub) broadcast(env SseEnvelope) {
+	if h == nil {
+		return
+	}
+	h.mu.RLock()
+	defer h.mu.RUnlock()
+
+	for ch := range h.clients {
+		select {
+		case ch <- env:
+		default:
+		}
+	}
+}
+
 func (h *SSEHub) PublishTransactionEvaluated(_ context.Context, evt transaction.TransactionEvaluatedEvent) error {
 	if h == nil {
 		return fmt.Errorf("sse hub is nil")
@@ -50,15 +72,17 @@ func (h *SSEHub) PublishTransactionEvaluated(_ context.Context, evt transaction.
 		return fmt.Errorf("marshal evaluated event: %w", err)
 	}
 
-	h.mu.RLock()
-	defer h.mu.RUnlock()
+	h.broadcast(SseEnvelope{Event: "transaction_evaluated", Payload: payload})
+	return nil
+}
 
-	for ch := range h.clients {
-		select {
-		case ch <- payload:
-		default:
-		}
+func (h *SSEHub) PublishSse(_ context.Context, event string, payload []byte) error {
+	if h == nil {
+		return fmt.Errorf("sse hub is nil")
 	}
-
+	if event == "" {
+		return fmt.Errorf("sse event name is empty")
+	}
+	h.broadcast(SseEnvelope{Event: event, Payload: payload})
 	return nil
 }

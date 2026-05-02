@@ -29,6 +29,7 @@ type RepositoryInterface interface {
 	GetTripleAmountAverageLast24HoursByUserID(userID uuid.UUID, excludeTxID *uuid.UUID) (int64, error)
 	Delete(id uuid.UUID) error
 	GetLastLocationByUserID(userID uuid.UUID) (string, error)
+	FindFraudByCreatedAtBetween(from time.Time, to time.Time, limit int) ([]*domain.Transaction, error)
 }
 
 type Repository struct {
@@ -94,6 +95,30 @@ func (r *Repository) UpdateFraudRules(transactionID uuid.UUID, rules []domain.Tr
 		}
 		if result.RowsAffected == 0 {
 			return fmt.Errorf("update fraud rules: %w", ErrTransactionNotFound)
+		}
+
+		var userIDs []uuid.UUID
+		if err := tx.Model(&domain.Transaction{}).
+			Where("id = ?", transactionID).
+			Limit(1).
+			Pluck("user_id", &userIDs).Error; err != nil {
+			return fmt.Errorf("update fraud rules: %w", err)
+		}
+		if len(userIDs) == 0 {
+			return fmt.Errorf("update fraud rules: %w", ErrTransactionNotFound)
+		}
+		userID := userIDs[0]
+
+		if err := tx.Exec(`
+			UPDATE users SET risk_rate = COALESCE((
+				SELECT LEAST(100::float8, GREATEST(0::float8,
+					(100.0 * COUNT(*) FILTER (WHERE fraud_status)) / NULLIF(COUNT(*)::float8, 0)
+				))
+				FROM transactions WHERE user_id = ?
+			), 0)
+			WHERE id = ?
+		`, userID, userID).Error; err != nil {
+			return fmt.Errorf("update fraud rules: %w", err)
 		}
 
 		return nil
@@ -227,6 +252,19 @@ func (r *Repository) Delete(id uuid.UUID) error {
 		return fmt.Errorf("delete transaction: %w", ErrTransactionNotFound)
 	}
 	return nil
+}
+
+func (r *Repository) FindFraudByCreatedAtBetween(from time.Time, to time.Time, limit int) ([]*domain.Transaction, error) {
+	var transactions []*domain.Transaction
+	q := r.db.Preload("FraudRules").
+		Where("fraud_status = ?", true).
+		Where("created_at >= ? AND created_at <= ?", from, to).
+		Order("created_at DESC").
+		Limit(limit)
+	if err := q.Find(&transactions).Error; err != nil {
+		return nil, fmt.Errorf("find fraud by created at between: %w", err)
+	}
+	return transactions, nil
 }
 
 func (r *Repository) GetLastLocationByUserID(userID uuid.UUID) (string, error) {

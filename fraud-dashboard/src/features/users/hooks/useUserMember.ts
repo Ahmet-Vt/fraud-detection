@@ -38,6 +38,7 @@ export function useUserMember(userId: string | undefined) {
           surname: string
           email?: string
           status: string
+          risk_rate?: number
           created_at: string
         }
 
@@ -49,6 +50,7 @@ export function useUserMember(userId: string | undefined) {
           surname: data.surname,
           email: data.email,
           status: data.status,
+          riskRate: typeof data.risk_rate === 'number' ? data.risk_rate : 0,
           createdAt: data.created_at,
         })
       } catch (err) {

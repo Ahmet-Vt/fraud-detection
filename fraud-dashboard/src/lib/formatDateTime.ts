@@ -36,3 +36,12 @@ export function formatCalendarDayHeading(value: string): string {
     day: 'numeric',
   })
 }
+
+export function formatChartBucketAxis(value: string, bucket: 'day' | 'hour'): string {
+  const d = parseDate(value)
+  if (!d) return '—'
+  if (bucket === 'day') {
+    return `${pad2(d.getDate())}.${pad2(d.getMonth() + 1)}.${d.getFullYear()}`
+  }
+  return `${pad2(d.getDate())}.${pad2(d.getMonth() + 1)} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`
+}

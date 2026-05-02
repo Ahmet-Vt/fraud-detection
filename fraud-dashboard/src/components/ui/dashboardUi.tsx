@@ -79,7 +79,6 @@ export type FraudStatusVariant = 'liveTable' | 'livePanel' | 'userDetailPill'
 type FraudStatusBadgeProps = {
   isFraud: boolean
   variant: FraudStatusVariant
-  /** Required for `liveTable` — e.g. `ui.badgeSize` */
   badgeSizeClass?: string
 }
 

@@ -55,37 +55,54 @@ type SseEvaluatedTransactionPayload = {
   user_id: string
   user_name: string
   user_surname: string
-  amount: number
+  amount: number | string
   location: string
-  fraud_status: boolean
-  created_at: string
+  fraud_status: boolean | 0 | 1
+  created_at: string | number
 }
 
 function mapSseEvaluatedTransaction(tx: SseEvaluatedTransactionPayload): LiveTransaction {
+  const amount = typeof tx.amount === 'number' ? tx.amount : Number(tx.amount)
+  const fraud =
+    typeof tx.fraud_status === 'boolean' ? tx.fraud_status : Boolean(Number(tx.fraud_status))
+  const created =
+    typeof tx.created_at === 'string'
+      ? tx.created_at
+      : typeof tx.created_at === 'number'
+        ? new Date(tx.created_at).toISOString()
+        : ''
   return {
     id: tx.transaction_id,
     userid: tx.user_id,
     userName: tx.user_name,
     userSurname: tx.user_surname,
-    amount: tx.amount,
+    amount,
     location: tx.location,
-    fraudstatus: tx.fraud_status,
-    createdat: tx.created_at,
+    fraudstatus: fraud,
+    createdat: created,
   }
+}
+
+function isNumericLike(value: unknown): value is number | string {
+  if (typeof value === 'number' && !Number.isNaN(value)) return true
+  if (typeof value === 'string' && value !== '' && !Number.isNaN(Number(value))) return true
+  return false
 }
 
 function isSseEvaluatedTransactionPayload(value: unknown): value is SseEvaluatedTransactionPayload {
   if (!value || typeof value !== 'object') return false
   const v = value as Record<string, unknown>
+  const fraud = v.fraud_status
+  const fraudOk = typeof fraud === 'boolean' || fraud === 0 || fraud === 1
   return (
     typeof v.transaction_id === 'string' &&
     typeof v.user_id === 'string' &&
     typeof v.user_name === 'string' &&
     typeof v.user_surname === 'string' &&
-    typeof v.amount === 'number' &&
+    isNumericLike(v.amount) &&
     typeof v.location === 'string' &&
-    typeof v.fraud_status === 'boolean' &&
-    typeof v.created_at === 'string'
+    fraudOk &&
+    (typeof v.created_at === 'string' || typeof v.created_at === 'number')
   )
 }
 
@@ -121,21 +138,25 @@ function normalizePayload(input: unknown): LiveTransaction[] {
   return mapped
 }
 
-function prependUnique(
+function mergeIncomingOverPrevious(
   incoming: LiveTransaction[],
   previous: LiveTransaction[],
   maxItems: number,
 ): LiveTransaction[] {
-  const next = [...incoming, ...previous]
-  const seen = new Set<string>()
-  const deduped: LiveTransaction[] = []
-  for (const tx of next) {
-    if (seen.has(tx.id)) continue
-    seen.add(tx.id)
-    deduped.push(tx)
-    if (deduped.length >= maxItems) break
+  const byId = new Map<string, LiveTransaction>()
+  for (const tx of previous) {
+    byId.set(tx.id, tx)
   }
-  return deduped
+  for (const tx of incoming) {
+    const prev = byId.get(tx.id)
+    byId.set(tx.id, prev ? { ...prev, ...tx } : tx)
+  }
+  const merged = [...byId.values()].sort((a, b) => {
+    const at = new Date(a.createdat).getTime()
+    const bt = new Date(b.createdat).getTime()
+    return bt - at
+  })
+  return merged.slice(0, maxItems)
 }
 
 export function useLiveTransactions({
@@ -249,7 +270,17 @@ export function useLiveTransactions({
           }
         }
         minuteBufferRef.current.push(...normalized)
-        setTransactions((prev) => prependUnique(normalized, prev, maxItems))
+        setTransactions((prev) => mergeIncomingOverPrevious(normalized, prev, maxItems))
+      }
+    }
+
+    const onTxEvent = (event: Event) => {
+      if (unmounted) return
+      const message = event as MessageEvent
+      try {
+        handlePayload(message.data)
+      } catch {
+        setError('sse message parse failed')
       }
     }
 
@@ -281,15 +312,8 @@ export function useLiveTransactions({
             setError('sse message parse failed')
           }
         }
-        source.addEventListener('transaction_evaluated', (event) => {
-          if (unmounted) return
-          const message = event as MessageEvent
-          try {
-            handlePayload(message.data)
-          } catch {
-            setError('sse message parse failed')
-          }
-        })
+        source.addEventListener('transaction_created', onTxEvent)
+        source.addEventListener('transaction_evaluated', onTxEvent)
         source.addEventListener('ready', () => {
           markConnected()
         })
@@ -316,6 +340,10 @@ export function useLiveTransactions({
     return () => {
       unmounted = true
       clearReconnectTimer()
+      if (source) {
+        source.removeEventListener('transaction_created', onTxEvent)
+        source.removeEventListener('transaction_evaluated', onTxEvent)
+      }
       source?.close()
     }
   }, [sseUrl, maxItems])

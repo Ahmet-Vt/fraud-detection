@@ -2,6 +2,7 @@ package transaction
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log"
@@ -37,6 +38,8 @@ type Service struct {
 
 const requestCountFraudThreshold = 5
 
+const maxFraudListLimit = 500
+
 func NewService(
 	repository RepositoryInterface,
 	createdPublisher transactionCreatedPublisher,
@@ -62,6 +65,8 @@ func (s *Service) CreateTransaction(ctx context.Context, transaction *domain.Tra
 	if err := s.repository.Create(transaction); err != nil {
 		return fmt.Errorf("create transaction: %w", err)
 	}
+
+	s.emitTransactionCreatedSSE(ctx, transaction.ID)
 
 	if err := s.SetLastLocationByUserID(ctx, transaction.UserID, transaction.Location); err != nil {
 		log.Printf("set last location cache after create transaction: %v", err)
@@ -95,6 +100,40 @@ func (s *Service) CreateTransaction(ctx context.Context, transaction *domain.Tra
 	return nil
 }
 
+type sseEmitter interface {
+	PublishSse(ctx context.Context, event string, payload []byte) error
+}
+
+func (s *Service) emitTransactionCreatedSSE(ctx context.Context, transactionID uuid.UUID) {
+	em, ok := s.evaluatedPublisher.(sseEmitter)
+	if !ok {
+		return
+	}
+	full, err := s.repository.FindByID(transactionID)
+	if err != nil {
+		log.Printf("sse transaction_created: reload transaction: %v", err)
+		return
+	}
+	evt := TransactionEvaluatedEvent{
+		TransactionID: full.ID.String(),
+		UserID:        full.UserID.String(),
+		UserName:      full.User.Name,
+		UserSurname:   full.User.Surname,
+		Amount:        full.Amount,
+		Location:      full.Location,
+		FraudStatus:   false,
+		CreatedAt:     full.CreatedAt,
+	}
+	b, err := json.Marshal(&evt)
+	if err != nil {
+		log.Printf("sse transaction_created: marshal: %v", err)
+		return
+	}
+	if err := em.PublishSse(ctx, "transaction_created", b); err != nil {
+		log.Printf("sse transaction_created: publish: %v", err)
+	}
+}
+
 func (s *Service) UpdateFraudRules(transactionID uuid.UUID, rules []domain.TransactionFraudRule) error {
 	if err := s.repository.UpdateFraudRules(transactionID, rules); err != nil {
 		return fmt.Errorf("replace fraud rules: %w", err)
@@ -126,6 +165,23 @@ func (s *Service) GetAllTransactions() ([]*domain.Transaction, error) {
 		return nil, fmt.Errorf("get all transactions: %w", err)
 	}
 
+	return transactions, nil
+}
+
+func (s *Service) FindFraudByCreatedAtRange(from, to time.Time, limit int) ([]*domain.Transaction, error) {
+	if to.Before(from) {
+		return nil, fmt.Errorf("find fraud by created at range: %w", ErrInvalidTimeRange)
+	}
+	if limit <= 0 {
+		limit = maxFraudListLimit
+	}
+	if limit > maxFraudListLimit {
+		limit = maxFraudListLimit
+	}
+	transactions, err := s.repository.FindFraudByCreatedAtBetween(from, to, limit)
+	if err != nil {
+		return nil, fmt.Errorf("find fraud by created at range: %w", err)
+	}
 	return transactions, nil
 }
 

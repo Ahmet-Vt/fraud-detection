@@ -31,7 +31,8 @@ type userResponse struct {
 	Surname   string            `json:"surname" example:"Vt" extensions:"x-order=2"`
 	Email     *string           `json:"email,omitempty" example:"ahmet@example.com" extensions:"x-order=3"`
 	Status    domain.UserStatus `json:"status" enums:"active,suspended,deleted" example:"active" extensions:"x-order=4"`
-	CreatedAt time.Time         `json:"created_at" swaggertype:"string" format:"date-time" example:"2026-04-15T19:00:00Z" extensions:"x-order=5"`
+	RiskRate  float64           `json:"risk_rate" example:"12.5" extensions:"x-order=5"`
+	CreatedAt time.Time         `json:"created_at" swaggertype:"string" format:"date-time" example:"2026-04-15T19:00:00Z" extensions:"x-order=6"`
 }
 
 type UserResponse = userResponse
@@ -169,6 +170,7 @@ func toUserResponse(u *domain.User) userResponse {
 		Surname:   u.Surname,
 		Email:     u.Email,
 		Status:    u.UserStatus,
+		RiskRate:  u.RiskRate,
 		CreatedAt: u.CreatedAt,
 	}
 }

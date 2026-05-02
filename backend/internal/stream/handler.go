@@ -44,11 +44,15 @@ func (h *Handler) StreamTransactions(c *gin.Context) {
 		select {
 		case <-c.Request.Context().Done():
 			return
-		case payload, ok := <-stream:
+		case msg, ok := <-stream:
 			if !ok {
 				return
 			}
-			if _, err := fmt.Fprintf(c.Writer, "event: transaction_evaluated\ndata: %s\n\n", payload); err != nil {
+			ev := msg.Event
+			if ev == "" {
+				ev = "message"
+			}
+			if _, err := fmt.Fprintf(c.Writer, "event: %s\ndata: %s\n\n", ev, msg.Payload); err != nil {
 				return
 			}
 			c.Writer.Flush()

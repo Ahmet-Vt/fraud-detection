@@ -34,6 +34,7 @@ type User struct {
 	Surname      string        `json:"surname" gorm:"type:varchar(100);not null"`
 	Email        *string       `json:"email" gorm:"type:varchar(255);uniqueIndex"`
 	UserStatus   UserStatus    `json:"status" gorm:"column:status;type:user_status;not null"`
+	RiskRate     float64       `json:"risk_rate" gorm:"column:risk_rate;not null;default:0"`
 	Transactions []Transaction `json:"transactions" gorm:"foreignKey:UserID"`
 	CreatedAt    time.Time     `json:"created_at" gorm:"not null;default:now()"`
 }

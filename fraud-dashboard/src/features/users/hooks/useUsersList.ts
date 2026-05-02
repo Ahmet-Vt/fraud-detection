@@ -25,6 +25,7 @@ export function useUsersList(usersUrl: string) {
           surname: string
           email?: string
           status: string
+          risk_rate?: number
           created_at: string
         }>
 
@@ -37,6 +38,7 @@ export function useUsersList(usersUrl: string) {
             surname: u.surname,
             email: u.email,
             status: u.status,
+            riskRate: typeof u.risk_rate === 'number' ? u.risk_rate : 0,
             createdAt: u.created_at,
           })),
         )

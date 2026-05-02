@@ -1,6 +1,3 @@
-// Command seed-transaction-dates spreads created_at for a user's most recent
-// transactions across a time window (local DB only; restart API or flush Redis
-// if cached transaction timestamps matter for your test).
 package main
 
 import (
@@ -91,8 +88,6 @@ func main() {
 	log.Printf("updated %d transaction(s) for user %s", len(ids), uid)
 }
 
-// spreadTimestamps returns len evenly spaced UTC times from start (oldest) to end (newest).
-// ids are ordered newest-first, so index 0 gets the newest timestamp (end).
 func spreadTimestamps(start, end time.Time, n int) []time.Time {
 	out := make([]time.Time, n)
 	if n == 1 {
@@ -101,7 +96,6 @@ func spreadTimestamps(start, end time.Time, n int) []time.Time {
 	}
 	delta := end.Sub(start)
 	for i := 0; i < n; i++ {
-		// i=0 newest -> end; i=n-1 oldest -> start
 		t := end.Add(-time.Duration(float64(delta) * float64(i) / float64(n-1)))
 		out[i] = t
 	}

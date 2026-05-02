@@ -7,6 +7,7 @@ import (
 	"net/url"
 	"os"
 	"strconv"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -64,9 +65,11 @@ func (c DBConfig) DSN() string {
 }
 
 type AppConfig struct {
-	DB       DBConfig
-	RabbitMQ RabbitMQConfig
-	Redis    RedisConfig
+	DB              DBConfig
+	RabbitMQ        RabbitMQConfig
+	Redis           RedisConfig
+	MCPStdioEnabled bool
+	MCPStandalone   bool
 }
 
 func Load() AppConfig {
@@ -106,6 +109,8 @@ func loadConfig() AppConfig {
 			Host: requireEnv("REDIS_HOST"),
 			Port: requireEnv("REDIS_PORT"),
 		},
+		MCPStdioEnabled: envBoolOrDefault("MCP_STDIO_ENABLED", false),
+		MCPStandalone:   envBoolOrDefault("MCP_STANDALONE", false),
 	}
 }
 
@@ -115,6 +120,22 @@ func requireEnv(key string) string {
 		log.Fatalf("missing required env var: %s", key)
 	}
 	return val
+}
+
+func envBoolOrDefault(key string, defaultValue bool) bool {
+	val := strings.TrimSpace(os.Getenv(key))
+	if val == "" {
+		return defaultValue
+	}
+	switch strings.ToLower(val) {
+	case "1", "true", "yes", "on":
+		return true
+	case "0", "false", "no", "off":
+		return false
+	default:
+		log.Printf("invalid %s=%q, using default %v", key, val, defaultValue)
+		return defaultValue
+	}
 }
 
 func envIntOrDefault(key string, defaultValue int) int {

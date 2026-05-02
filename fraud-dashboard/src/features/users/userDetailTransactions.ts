@@ -14,7 +14,6 @@ export type DailySummaryPoint = {
   amountAvg: number
 }
 
-/** Inclusive calendar-day range in the user's local timezone, or all-time. */
 export type UserTransactionDateRange =
   | { kind: 'all' }
   | { kind: 'between'; fromDay: string; toDay: string }
@@ -53,7 +52,14 @@ function pickBucket(from: Date, to: Date): string {
   return hours <= 48 ? 'hour' : 'day'
 }
 
-/** Query string for `.../detail` (includes bucket). */
+export function pickChartBucketForRange(range: UserTransactionDateRange): 'day' | 'hour' {
+  if (range.kind === 'all') return 'day'
+  const from = startOfLocalDayFromKey(range.fromDay)
+  const to = endOfLocalDayFromKey(range.toDay)
+  const b = pickBucket(from, to)
+  return b === 'hour' ? 'hour' : 'day'
+}
+
 export function userTransactionDetailQuery(range: UserTransactionDateRange): string {
   if (range.kind === 'all') {
     return 'bucket=day'

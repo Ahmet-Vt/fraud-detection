@@ -968,10 +968,15 @@
                     "x-order": "4",
                     "example": "active"
                 },
+                "risk_rate": {
+                    "type": "number",
+                    "x-order": "5",
+                    "example": 12.5
+                },
                 "created_at": {
                     "type": "string",
                     "format": "date-time",
-                    "x-order": "5",
+                    "x-order": "6",
                     "example": "2026-04-15T19:00:00Z"
                 }
             }

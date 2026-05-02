@@ -4,5 +4,6 @@ export type UserRow = {
   surname: string
   email?: string
   status: string
+  riskRate?: number
   createdAt: string
 }

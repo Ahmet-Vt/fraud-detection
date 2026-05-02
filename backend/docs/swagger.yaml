@@ -308,7 +308,7 @@ definitions:
         example: "2026-04-15T19:00:00Z"
         format: date-time
         type: string
-        x-order: "5"
+        x-order: "6"
       email:
         example: ahmet@example.com
         type: string
@@ -322,6 +322,10 @@ definitions:
         example: Ahmet
         type: string
         x-order: "1"
+      risk_rate:
+        example: 12.5
+        type: number
+        x-order: "5"
       status:
         allOf:
         - $ref: '#/definitions/domain.UserStatus'

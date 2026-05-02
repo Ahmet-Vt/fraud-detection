@@ -3,14 +3,14 @@ import { useParams } from 'react-router-dom'
 import { useScreen } from '../config/ScreenContext'
 import UserTransactionsChartCard from '../features/users/UserTransactionsChartCard'
 import UserTransactionsTableCard from '../features/users/UserTransactionsTableCard'
-import { rangeLastNDays, type UserTransactionDateRange } from '../features/users/userDetailTransactions'
+import { rangeAll, type UserTransactionDateRange } from '../features/users/userDetailTransactions'
 import type { UserRow } from '../features/users/userTypes'
 import { useUserMember } from '../features/users/hooks/useUserMember'
 import { useUserTransactionDetail } from '../features/users/hooks/useUserTransactionDetail'
 
 function UserDetailTransactionsBody({ user }: { user: UserRow }) {
   const { ui } = useScreen()
-  const [dateRange, setDateRange] = useState<UserTransactionDateRange>(() => rangeLastNDays(7))
+  const [dateRange, setDateRange] = useState<UserTransactionDateRange>(() => rangeAll())
   const { transactions, dailySummary, isLoading, error } = useUserTransactionDetail(user.id, dateRange)
 
   const anomalyCount = useMemo(
@@ -24,6 +24,7 @@ function UserDetailTransactionsBody({ user }: { user: UserRow }) {
       <UserTransactionsChartCard
         user={user}
         dailySummary={dailySummary}
+        dateRange={dateRange}
         anomalyRatio={anomalyRatio}
         isLoading={isLoading}
         error={error}
