@@ -53,7 +53,9 @@ export function useUserTransactionDetail(userId: string, dateRange: UserTransact
             amount: number
             location: string
             fraud_status: boolean
+            transaction_status?: string
             created_at?: string
+            fraud_rules?: Array<{ rule_name: string; matched: boolean }>
           }>
           summary: Array<{
             bucket_start: string
@@ -72,6 +74,11 @@ export function useUserTransactionDetail(userId: string, dateRange: UserTransact
           location: tx.location,
           fraudStatus: tx.fraud_status,
           createdAt: tx.created_at ?? '',
+          transactionStatus: tx.transaction_status ?? 'pending',
+          fraudRules: (tx.fraud_rules ?? []).map((r) => ({
+            ruleName: r.rule_name,
+            matched: r.matched,
+          })),
         }))
 
         const mappedSummary = summaryPayload

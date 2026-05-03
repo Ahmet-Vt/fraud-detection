@@ -26,14 +26,20 @@ type createTransactionRequest struct {
 
 type CreateTransactionRequest = createTransactionRequest
 
+type fraudRuleEvaluationResponse struct {
+	RuleName domain.FraudRuleName `json:"rule_name" enums:"amount,location,velocity" example:"amount" extensions:"x-order=0"`
+	Matched  bool                 `json:"matched" example:"true" extensions:"x-order=1"`
+}
+
 type transactionResponse struct {
-	ID                uuid.UUID     `json:"id" format:"uuid" example:"1dc90ef0-76a0-4cb2-891e-5193c60aa82f" extensions:"x-order=0"`
-	UserID            uuid.UUID     `json:"user_id" format:"uuid" example:"4ca5e74c-3a07-4010-9f07-14e90a35868b" extensions:"x-order=1"`
-	Amount            int64         `json:"amount" example:"5000" extensions:"x-order=2"`
-	Location          string        `json:"location" example:"Istanbul" extensions:"x-order=3"`
-	TransactionStatus domain.Status `json:"transaction_status" enums:"pending,completed,failed" example:"pending" extensions:"x-order=4"`
-	FraudStatus       bool          `json:"fraud_status" example:"false" extensions:"x-order=5"`
-	CreatedAt         time.Time     `json:"created_at" swaggertype:"string" format:"date-time" example:"2026-05-02T12:00:00Z" extensions:"x-order=6"`
+	ID                uuid.UUID                     `json:"id" format:"uuid" example:"1dc90ef0-76a0-4cb2-891e-5193c60aa82f" extensions:"x-order=0"`
+	UserID            uuid.UUID                     `json:"user_id" format:"uuid" example:"4ca5e74c-3a07-4010-9f07-14e90a35868b" extensions:"x-order=1"`
+	Amount            int64                         `json:"amount" example:"5000" extensions:"x-order=2"`
+	Location          string                        `json:"location" example:"Istanbul" extensions:"x-order=3"`
+	TransactionStatus domain.Status                 `json:"transaction_status" enums:"pending,completed,failed" example:"pending" extensions:"x-order=4"`
+	FraudStatus       bool                          `json:"fraud_status" example:"false" extensions:"x-order=5"`
+	CreatedAt         time.Time                     `json:"created_at" swaggertype:"string" format:"date-time" example:"2026-05-02T12:00:00Z" extensions:"x-order=6"`
+	FraudRules        []fraudRuleEvaluationResponse `json:"fraud_rules,omitempty"`
 }
 
 type TransactionResponse = transactionResponse
@@ -432,6 +438,13 @@ func (h *Handler) writeError(c *gin.Context, err error) {
 }
 
 func toTransactionResponse(transaction *domain.Transaction) transactionResponse {
+	rules := make([]fraudRuleEvaluationResponse, 0, len(transaction.FraudRules))
+	for _, r := range transaction.FraudRules {
+		rules = append(rules, fraudRuleEvaluationResponse{
+			RuleName: r.RuleName,
+			Matched:  r.Matched,
+		})
+	}
 	return transactionResponse{
 		ID:                transaction.ID,
 		UserID:            transaction.UserID,
@@ -440,6 +453,7 @@ func toTransactionResponse(transaction *domain.Transaction) transactionResponse 
 		TransactionStatus: transaction.TransactionStatus,
 		FraudStatus:       transaction.FraudStatus,
 		CreatedAt:         transaction.CreatedAt,
+		FraudRules:        rules,
 	}
 }
 

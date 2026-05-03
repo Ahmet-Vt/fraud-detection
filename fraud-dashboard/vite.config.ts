@@ -6,17 +6,10 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     proxy: {
-      '/stream': {
+      '/api': {
         target: 'http://localhost:8080',
         changeOrigin: true,
-      },
-      '/users': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
-      },
-      '/transactions': {
-        target: 'http://localhost:8080',
-        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api/, '') || '/',
       },
     },
   },

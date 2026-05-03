@@ -28,7 +28,6 @@ type RepositoryInterface interface {
 	FindPreviousByUserID(userID uuid.UUID, before time.Time) (*domain.Transaction, bool, error)
 	GetTripleAmountAverageLast24HoursByUserID(userID uuid.UUID, excludeTxID *uuid.UUID) (int64, error)
 	Delete(id uuid.UUID) error
-	GetLastLocationByUserID(userID uuid.UUID) (string, error)
 	FindFraudByCreatedAtBetween(from time.Time, to time.Time, limit int) ([]*domain.Transaction, error)
 }
 
@@ -265,22 +264,6 @@ func (r *Repository) FindFraudByCreatedAtBetween(from time.Time, to time.Time, l
 		return nil, fmt.Errorf("find fraud by created at between: %w", err)
 	}
 	return transactions, nil
-}
-
-func (r *Repository) GetLastLocationByUserID(userID uuid.UUID) (string, error) {
-	var transaction domain.Transaction
-	if err := r.db.Model(&domain.Transaction{}).
-		Select("location").
-		Where("user_id = ?", userID).
-		Order("created_at DESC").
-		Take(&transaction).Error; err != nil {
-		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return "", nil
-		}
-		return "", fmt.Errorf("get last location by user transaction id: %w", err)
-	}
-
-	return transaction.Location, nil
 }
 
 func isUniqueViolation(err error) bool {

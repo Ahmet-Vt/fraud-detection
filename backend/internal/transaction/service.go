@@ -23,7 +23,6 @@ type transactionEvaluatedPublisher interface {
 }
 
 type transactionStateCache interface {
-	GetLastLocationByUserID(ctx context.Context, userID uuid.UUID) (string, bool, error)
 	SetLastLocationByUserID(ctx context.Context, userID uuid.UUID, location string) error
 	SetLastTransactionCreatedAtByUserID(ctx context.Context, userID uuid.UUID, createdAt time.Time) error
 	IncrementAndGetRequestCountByUserID(ctx context.Context, userID uuid.UUID, requestTime time.Time) (int, error)
@@ -265,32 +264,6 @@ func (s *Service) GetTripleAmountAverageLast24HoursByUserID(userID uuid.UUID, ex
 	}
 
 	return tripleAverage, nil
-}
-
-func (s *Service) GetLastLocationByUserID(ctx context.Context, userID uuid.UUID) (string, error) {
-	if s.cache != nil {
-		location, found, err := s.cache.GetLastLocationByUserID(ctx, userID)
-		if err == nil {
-			if found {
-				return location, nil
-			}
-		} else {
-			log.Printf("get last location cache: %v", err)
-		}
-	}
-
-	location, err := s.repository.GetLastLocationByUserID(userID)
-	if err != nil {
-		return "", fmt.Errorf("get last location by user transaction id: %w", err)
-	}
-
-	if location != "" {
-		if err := s.SetLastLocationByUserID(ctx, userID, location); err != nil {
-			log.Printf("set last location cache after db fetch: %v", err)
-		}
-	}
-
-	return location, nil
 }
 
 func (s *Service) SetLastLocationByUserID(ctx context.Context, userID uuid.UUID, location string) error {

@@ -3,15 +3,15 @@ function envOr(key: string, fallback: string): string {
   return typeof raw === 'string' && raw.trim() !== '' ? raw.trim() : fallback
 }
 
-export const apiSseLiveTransactionsUrl = envOr('VITE_SSE_URL', '/stream/transactions')
+export const apiSseLiveTransactionsUrl = envOr('VITE_SSE_URL', '/api/stream/transactions')
 
-export const apiUsersCollectionUrl = envOr('VITE_USERS_URL', '/users')
+export const apiUsersCollectionUrl = envOr('VITE_USERS_URL', '/api/users')
 
 export function apiUserMemberUrl(userId: string): string {
   return `${apiUsersCollectionUrl}/${encodeURIComponent(userId)}`
 }
 
-export const apiUserTransactionsBaseUrl = envOr('VITE_USER_TRANSACTIONS_URL', '/transactions/user')
+export const apiUserTransactionsBaseUrl = envOr('VITE_USER_TRANSACTIONS_URL', '/api/transactions/user')
 
 export function apiUserTransactionListUrl(
   userId: string,

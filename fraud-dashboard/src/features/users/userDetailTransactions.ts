@@ -1,9 +1,16 @@
+export type UserTransactionFraudRule = {
+  ruleName: string
+  matched: boolean
+}
+
 export type UserTransaction = {
   id: string
   amount: number
   location: string
   fraudStatus: boolean
   createdAt: string
+  transactionStatus: string
+  fraudRules: UserTransactionFraudRule[]
 }
 
 export type DailySummaryPoint = {

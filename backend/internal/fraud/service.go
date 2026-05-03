@@ -30,7 +30,9 @@ type transactionReaderWriter interface {
 
 type transactionStateCache interface {
 	GetLastLocationByUserID(ctx context.Context, userID uuid.UUID) (string, bool, error)
+	SetLastLocationByUserID(ctx context.Context, userID uuid.UUID, location string) error
 	GetLastTransactionCreatedAtByUserID(ctx context.Context, userID uuid.UUID) (time.Time, bool, error)
+	SetLastTransactionCreatedAtByUserID(ctx context.Context, userID uuid.UUID, createdAt time.Time) error
 	GetRequestCountByUserID(ctx context.Context, userID uuid.UUID, referenceTime time.Time) (int, error)
 	GetLast24HoursAverageSpendByUserID(ctx context.Context, userID uuid.UUID) (int64, bool, error)
 	SetLast24HoursAverageSpendByUserID(ctx context.Context, userID uuid.UUID, average int64) error
@@ -248,9 +250,29 @@ func (s *Service) evaluateLocationRule(
 	if err := ctx.Err(); err != nil {
 		return false, err
 	}
+	matched := computeLocationImpossibleTravelMatch(currentTransaction, previousTransaction, hasPrevious, cacheInputs)
+
+	if s.cache != nil && !matched {
+		if err := s.cache.SetLastLocationByUserID(ctx, currentTransaction.UserID, currentTransaction.Location); err != nil {
+			return false, errors.Join(ErrLastLocationCacheFailed, err)
+		}
+		if err := s.cache.SetLastTransactionCreatedAtByUserID(ctx, currentTransaction.UserID, currentTransaction.CreatedAt); err != nil {
+			return false, errors.Join(ErrLastCreatedAtCacheFailed, err)
+		}
+	}
+
+	return matched, nil
+}
+
+func computeLocationImpossibleTravelMatch(
+	currentTransaction *domain.Transaction,
+	previousTransaction *domain.Transaction,
+	hasPrevious bool,
+	cacheInputs cachedRuleInputs,
+) bool {
 	currentCity := normalizeCity(currentTransaction.Location)
 	if currentCity == "" {
-		return false, nil
+		return false
 	}
 	previousCity := ""
 	previousCreatedAt := time.Time{}
@@ -270,26 +292,26 @@ func (s *Service) evaluateLocationRule(
 
 	if !hasCachePrevious {
 		if !hasPrevious || previousTransaction == nil {
-			return false, nil
+			return false
 		}
 		previousCity = normalizeCity(previousTransaction.Location)
 		previousCreatedAt = previousTransaction.CreatedAt
 	}
 	if previousCity == "" || previousCreatedAt.IsZero() {
-		return false, nil
+		return false
 	}
 
 	if currentCity == previousCity {
-		return false, nil
+		return false
 	}
 
 	currentCoordinates, ok := distance.GetCityCoordinates(currentCity)
 	if !ok {
-		return false, nil
+		return false
 	}
 	previousCoordinates, ok := distance.GetCityCoordinates(previousCity)
 	if !ok {
-		return false, nil
+		return false
 	}
 
 	kmDistance := distance.HaversineDistance(
@@ -300,12 +322,12 @@ func (s *Service) evaluateLocationRule(
 	)
 	elapsed := currentTransaction.CreatedAt.Sub(previousCreatedAt)
 	if elapsed < 0 {
-		return false, nil
+		return false
 	}
 
 	reachable := distance.IsReachableWithPlane(kmDistance, elapsed)
 
-	return !reachable, nil
+	return !reachable
 }
 
 func (s *Service) evaluateVelocityRule(

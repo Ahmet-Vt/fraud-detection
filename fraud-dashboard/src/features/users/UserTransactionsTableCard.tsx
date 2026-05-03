@@ -5,6 +5,16 @@ import { AppCard, FraudStatusBadge, SimplePagination, tableScrollAreaClass } fro
 import type { UserTransaction, UserTransactionDateRange } from './userDetailTransactions'
 import UserTransactionRangePickerButton from './UserTransactionRangePickerButton'
 
+const FRAUD_RULE_LABEL: Record<string, string> = {
+  amount: 'Amount',
+  location: 'Location',
+  velocity: 'Velocity',
+}
+
+function fraudRuleLabel(ruleName: string): string {
+  return FRAUD_RULE_LABEL[ruleName] ?? ruleName
+}
+
 const pageSize = 100
 
 type TransactionTableSegment =
@@ -40,6 +50,7 @@ export default function UserTransactionsTableCard({
 }: UserTransactionsTableCardProps) {
   const { isMd, ui } = useScreen()
   const [page, setPage] = useState(1)
+  const [hoveredTx, setHoveredTx] = useState<UserTransaction | null>(null)
 
   useEffect(() => {
     setPage(1)
@@ -69,50 +80,107 @@ export default function UserTransactionsTableCard({
           textClass={ui.tableCellText}
         />
       </div>
-      <div className={tableScrollAreaClass(isMd)}>
-        <table className={`table table-zebra ${ui.tableSize} min-w-[20rem]`}>
-          <thead>
-            <tr className={`sticky top-0 z-10 bg-base-100 ${ui.tableCellText}`}>
-              <th>ID</th>
-              <th>Amount</th>
-              {!isMd && <th>Location</th>}
-              <th>Anomaly</th>
-              <th>Date</th>
-            </tr>
-          </thead>
-          <tbody>
-            {!isLoading && pagedTransactions.length === 0 ? (
-              <tr>
-                <td colSpan={isMd ? 4 : 5} className="text-center opacity-70">
-                  No transactions for this user.
-                </td>
+      <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-stretch">
+        <div className={['min-w-0 flex-1', tableScrollAreaClass(isMd)].join(' ')}>
+          <table className={`table table-zebra ${ui.tableSize} min-w-[20rem]`}>
+            <thead>
+              <tr className={`sticky top-0 z-10 bg-base-100 ${ui.tableCellText}`}>
+                <th>ID</th>
+                <th>Amount</th>
+                {!isMd && <th>Location</th>}
+                <th>Anomaly</th>
+                <th>Date</th>
               </tr>
-            ) : (
-              tableSegments.map((seg) =>
-                seg.kind === 'day' ? (
-                  <tr key={`day-${seg.dayKey}`} className="bg-base-200/90">
-                    <td
-                      colSpan={isMd ? 4 : 5}
-                      className={`${ui.tableCellText} py-2 text-sm font-semibold tracking-tight`}
+            </thead>
+            <tbody>
+              {!isLoading && pagedTransactions.length === 0 ? (
+                <tr>
+                  <td colSpan={isMd ? 4 : 5} className="text-center opacity-70">
+                    No transactions for this user.
+                  </td>
+                </tr>
+              ) : (
+                tableSegments.map((seg) =>
+                  seg.kind === 'day' ? (
+                    <tr key={`day-${seg.dayKey}`} className="bg-base-200/90">
+                      <td
+                        colSpan={isMd ? 4 : 5}
+                        className={`${ui.tableCellText} py-2 text-sm font-semibold tracking-tight`}
+                      >
+                        {seg.label}
+                      </td>
+                    </tr>
+                  ) : (
+                    <tr
+                      key={seg.tx.id}
+                      className={`${ui.tableCellText} cursor-default transition-colors hover:bg-base-200/60`}
+                      onMouseEnter={() => setHoveredTx(seg.tx)}
+                      onMouseLeave={() => setHoveredTx(null)}
                     >
-                      {seg.label}
-                    </td>
-                  </tr>
+                      <td className="font-medium">{seg.tx.id}</td>
+                      <td>${seg.tx.amount.toLocaleString()}</td>
+                      {!isMd && <td>{seg.tx.location}</td>}
+                      <td>
+                        <FraudStatusBadge isFraud={seg.tx.fraudStatus} variant="userDetailPill" />
+                      </td>
+                      <td className="whitespace-nowrap">{formatDateTime(seg.tx.createdAt)}</td>
+                    </tr>
+                  ),
+                )
+              )}
+            </tbody>
+          </table>
+        </div>
+        <aside className="w-full shrink-0 lg:sticky lg:top-4 lg:self-start lg:w-72">
+          <AppCard bodyPaddingClass={`${ui.cardBodyPadding} py-4`} className="shadow-sm">
+            <h4 className={`card-title mb-2 text-sm ${ui.cardTitleText}`}>Fraud rules</h4>
+            {!hoveredTx ? (
+              <p className={`m-0 text-sm opacity-70 ${ui.tableCellText}`}>
+                Hover a transaction row to see how each rule evaluated for that request.
+              </p>
+            ) : (
+              <div className={`flex flex-col gap-3 ${ui.tableCellText}`}>
+                <div className="min-w-0">
+                  <p className="m-0 truncate text-xs opacity-60">Transaction</p>
+                  <p className="m-0 truncate font-mono text-xs font-medium" title={hoveredTx.id}>
+                    {hoveredTx.id}
+                  </p>
+                  <p className="mt-1 m-0 text-xs opacity-80">
+                    Status: <span className="font-medium capitalize">{hoveredTx.transactionStatus}</span>
+                  </p>
+                </div>
+                {hoveredTx.transactionStatus === 'pending' ? (
+                  <p className="m-0 text-sm opacity-80">Fraud evaluation has not finished for this transaction yet.</p>
+                ) : hoveredTx.fraudRules.length === 0 ? (
+                  <p className="m-0 text-sm opacity-80">No stored rule results for this transaction.</p>
                 ) : (
-                  <tr key={seg.tx.id} className={ui.tableCellText}>
-                    <td className="font-medium">{seg.tx.id}</td>
-                    <td>${seg.tx.amount.toLocaleString()}</td>
-                    {!isMd && <td>{seg.tx.location}</td>}
-                    <td>
-                      <FraudStatusBadge isFraud={seg.tx.fraudStatus} variant="userDetailPill" />
-                    </td>
-                    <td className="whitespace-nowrap">{formatDateTime(seg.tx.createdAt)}</td>
-                  </tr>
-                ),
-              )
+                  <ul className="m-0 list-none space-y-2 p-0">
+                    {hoveredTx.fraudRules.map((r) => (
+                      <li
+                        key={`${hoveredTx.id}-${r.ruleName}`}
+                        className="flex items-center justify-between gap-2 rounded-lg bg-base-200/50 px-2 py-1.5 text-sm"
+                      >
+                        <span className="min-w-0 font-medium">{fraudRuleLabel(r.ruleName)}</span>
+                        <span
+                          className={
+                            r.matched
+                              ? `badge shrink-0 ${ui.badgeSize} badge-error badge-outline`
+                              : `badge shrink-0 ${ui.badgeSize} badge-success badge-outline`
+                          }
+                        >
+                          {r.matched ? 'Matched' : 'Clear'}
+                        </span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                <p className="m-0 border-t border-base-300 pt-2 text-xs opacity-60">
+                  Anomaly flag uses two or more matched rules. Single rule hits stay &quot;clear&quot; at account level.
+                </p>
+              </div>
             )}
-          </tbody>
-        </table>
+          </AppCard>
+        </aside>
       </div>
       {transactions.length > 0 && (
         <SimplePagination

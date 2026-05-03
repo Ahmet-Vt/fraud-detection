@@ -147,8 +147,13 @@ export default function UserTransactionsChartCard({
                     allowDecimals={false}
                   />
                   <Tooltip
-                    labelFormatter={(value: string | number) => {
-                      const key = typeof value === 'string' ? value : chartData[Number(value)]?.createdAt
+                    labelFormatter={(label) => {
+                      const key =
+                        typeof label === 'string'
+                          ? label
+                          : typeof label === 'number' && !Number.isNaN(label)
+                            ? chartData[label]?.createdAt
+                            : undefined
                       const point = key ? chartData.find((d) => d.createdAt === key) : undefined
                       if (!point) return '—'
                       if (chartBucket === 'hour') {
