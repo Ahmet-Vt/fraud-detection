@@ -10,10 +10,10 @@ Infrastructure runs in **Docker** (`[docker-compose.yml](docker-compose.yml)`): 
 
 ### Technology choices (why these parts)
 
-- **Go** — One compiled program can host the HTTP API, background RabbitMQ consumers, and optional MCP in the same process with clear wiring. The standard library and common patterns (interfaces, explicit error handling) keep the fraud pipeline and storage code easy to read and change. It was also a good fit for learning the language on a small, end-to-end service.
-- **React (Vite + TypeScript)** — The dashboard is mostly lists, forms, charts, and a live feed. React’s component model and TypeScript’s types help keep that UI organized as it grows. **Server-Sent Events** map cleanly to “append or update rows when the server pushes an event,” without a custom binary protocol in the browser.
-- **RabbitMQ** — Fraud runs **after** the HTTP handler returns, so work needs a small, reliable queue. RabbitMQ fits a single exchange / routing setup and is straightforward to run in Docker for a demo. **Kafka** would add more moving parts (topics, partitions, retention tuning) than this project needs.
-- **Redis** — Fraud rules reuse short-lived state (request counts in a time window, optional cached averages, last location for travel checks). Redis supports keys with TTL and sorted sets with scores, which matches those patterns without adding another application-specific service.
+- **Go**  One compiled program can host the HTTP API, background RabbitMQ consumers, and optional MCP in the same process with clear wiring. The standard library and common patterns (interfaces, explicit error handling) keep the fraud pipeline and storage code easy to read and change. It was also a good fit for learning the language on a small, end-to-end service.
+- **React (Vite + TypeScript)**  The dashboard is mostly lists, forms, charts, and a live feed. React’s component model and TypeScript’s types help keep that UI organized as it grows. **Server-Sent Events** map cleanly to “append or update rows when the server pushes an event,” without a custom binary protocol in the browser.
+- **RabbitMQ**  Fraud runs **after** the HTTP handler returns, so work needs a small, reliable queue. RabbitMQ fits a single exchange / routing setup and is straightforward to run in Docker for a demo. **Kafka** would add more moving parts (topics, partitions, retention tuning) than this project needs.
+- **Redis**  Fraud rules reuse short-lived state (request counts in a time window, optional cached averages, last location for travel checks). Redis supports keys with TTL and sorted sets with scores, which matches those patterns without adding another application-specific service.
 
 ### Architecture diagram
 
