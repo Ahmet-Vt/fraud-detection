@@ -1,5 +1,7 @@
 package distance
 
+import "strings"
+
 type CityCoordinates struct {
 	Lat float64
 	Lon float64
@@ -92,4 +94,13 @@ var CityCoordinatesByName = map[string]CityCoordinates{
 func GetCityCoordinates(city string) (CityCoordinates, bool) {
 	coords, ok := CityCoordinatesByName[city]
 	return coords, ok
+}
+
+func LocationUsableForImpossibleTravel(location string) bool {
+	c := strings.ToLower(strings.TrimSpace(location))
+	if c == "" {
+		return false
+	}
+	_, ok := GetCityCoordinates(c)
+	return ok
 }

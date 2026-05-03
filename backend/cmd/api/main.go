@@ -79,17 +79,6 @@ func main() {
 		Transactions: transactionService,
 	}
 
-	if cfg.MCPStandalone {
-		if !cfg.MCPStdioEnabled {
-			log.Fatal("MCP_STANDALONE requires MCP_STDIO_ENABLED=true")
-		}
-		log.Print("MCP_STANDALONE: serving MCP on stdio only (no HTTP); safe for MCP Inspector")
-		if err := fraudmcp.RunStdio(mcpDeps); err != nil {
-			log.Fatalf("mcp stdio: %v", err)
-		}
-		return
-	}
-
 	router := gin.Default()
 	router.GET("/health", healthHandler(db, redisClient, rabbitMQClient))
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
@@ -100,12 +89,12 @@ func main() {
 	if cfg.MCPStdioEnabled {
 		go func() {
 			if err := fraudmcp.RunStdio(mcpDeps); err != nil {
-				log.Printf("mcp stdio server: %v", err)
+				log.Printf("mcp stdio: %v", err)
 			}
 		}()
 	}
 
-	if err := router.Run(); err != nil {
+	if err := router.Run(cfg.HTTPListenAddr); err != nil {
 		log.Fatal(err)
 	}
 }

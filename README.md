@@ -6,73 +6,156 @@ This repository is a **fraud-detection** demo stack: a **Go (Gin)** backend stor
 
 ## SYSTEM ARCHITECTURE AND COMPONENTS EXPLANATION
 
-Infrastructure runs in **Docker** ([`docker-compose.yml`](docker-compose.yml)): **PostgreSQL**, **Redis**, and **RabbitMQ** (with the management UI on the mapped management port). The **backend** (`backend/`) is a Go service using a classic **handler → service → repository** layout against Postgres. **Transaction** creation goes through the service, touches Redis where transaction state is cached, and emits work to **RabbitMQ**. **Fraud workers** consume those messages, evaluate rules (including concurrent rule checks), update fraud status, and notify subscribers. **SSE** pushes live transaction updates from the backend to the **fraud-dashboard** (`fraud-dashboard/`), which talks to the API over HTTP during development via the **Vite dev proxy** ([`fraud-dashboard/vite.config.ts`](fraud-dashboard/vite.config.ts)). An external **MCP client** (e.g. Cursor or MCP Inspector) can attach to the same binary’s **stdio MCP** surface when enabled.
+Infrastructure runs in **Docker** (`[docker-compose.yml](docker-compose.yml)`): **PostgreSQL**, **Redis**, **RabbitMQ**, `**api`** (`[backend/Dockerfile](backend/Dockerfile)`), `**web`** (`[fraud-dashboard/Dockerfile](fraud-dashboard/Dockerfile)`). The backend uses **handler → service → repository**; RabbitMQ consumers and optional stdio MCP run **in the same `api` process** as Gin. Local dashboard dev uses **Vite** (`[fraud-dashboard/vite.config.ts](fraud-dashboard/vite.config.ts)`); the `**web`** image serves the built SPA and proxies `**/api`** to `**api:8080**`.
 
-### Architecture diagram (image)
+### Architecture diagram
 
-**[`docs/architecture.png`](docs/architecture.png)** 
+`**[docs/architecture.png](docs/architecture.png)**` 
 
-![System architecture](docs/architecture.png)
+System architecture
+
+---
+
+## REQUIREMENTS (what to install)
+
+
+| Goal                                                    | Install                                                                                                                                                                                                                           |
+| ------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Full stack in Docker only**                           | **Docker** + `**docker compose`**. Nothing else is required. Images for `**api`** and `**web**` are built automatically when you run `**docker compose up --build**` — you do **not** run `docker build` by hand for the app.     |
+| **Backend on the host** (`go run ./cmd/api`)            | **Go 1.26+** (see `[backend/go.mod](backend/go.mod)`), `**backend/.env`**, and Postgres / Redis / RabbitMQ reachable (e.g. the same Compose stack without the `api` container, or full Compose with a different `API_HOST_PORT`). |
+| **Dashboard on the host** (`npm run dev`)               | **Node.js** + **npm** in `[fraud-dashboard/](fraud-dashboard/)` (`npm ci` then `npm run dev`).                                                                                                                                    |
+| **Load / manual bash scripts**                          | `**bash`**, `**curl`**, `**jq**` (`[backend/scripts/](backend/scripts/)`). On Windows, use **Git Bash** or **WSL** if `bash` is missing.                                                                                          |
+| **MCP Inspector (example in [MCP USAGE](#mcp-usage))**  | **Node** / `**npx`** for `@modelcontextprotocol/inspector`.                                                                                                                                                                       |
+| **Regenerate Swagger after changing Go route comments** | `**swag`** CLI (`go install github.com/swaggo/swag/cmd/swag@latest`); committed docs live under `[backend/docs/](backend/docs/)`. Optional for normal use.                                                                        |
+| **Optional dev auto-rebuild**                           | `[backend/Makefile](backend/Makefile)` target `**daemon`** uses **CompileDaemon** (`go install github.com/githubnemo/CompileDaemon@latest`).                                                                                      |
+
 
 ---
 
 ## PROJECT SETUP STEPS
 
-1. **Clone** this repository and `cd` into it.
+### 1. Clone and enter the repo
 
-2. **Environment for Docker Compose**  
-   At the **repository root**, create a `.env` file with the variables expected by [`docker-compose.yml`](docker-compose.yml) (same names as in [`backend/.env.example`](backend/.env.example): 
-   Postgres database/user/password/host/port,
-   Redis host/port, 
-   RabbitMQ host/port/user/password/management port). `docker compose` reads the root `.env` for substitution.
+```bash
+git clone <repository-url> fraud-detection
+cd fraud-detection
+```
 
-3. **Start infrastructure**
+### 2. Environment: `backend/.env`
 
-   ```bash
-   docker compose up -d
-   ```
+Create the file from the example, then edit values (passwords, ports, etc.):
 
-4. **Backend environment**  
-   Copy [`backend/.env.example`](backend/.env.example) to `backend/.env` and adjust values so they match your Docker services (host `localhost` and ports from compose unless you override them).
+```bash
+cp backend/.env.example backend/.env
+```
 
-5. **Run database migrations**  
-   Migrations run automatically when the API process starts (`backend/cmd/api/main.go`).
+- **Docker-only:** you still need `**backend/.env`** — the `**api`** service loads it via `env_file` in `[docker-compose.yml](docker-compose.yml)`. The app does **not** read the repo-root `.env` by itself.
+- **Root `.env`:** only used by Compose for `**${POSTGRES_PORT}`**, `**${API_HOST_PORT}`**, etc. Easiest: same file as `backend/.env` (symlink on Linux/macOS, or copy on Windows).
+- `**go run` on the host:** keep `**POSTGRES_HOST`**, `**REDIS_HOST`**, `**RABBITMQ_HOST**` as `**localhost**`. Inside the `**api**` container, Compose overrides those to `**postgres**`, `**redis**`, `**rabbitmq**`.
 
-6. **Run the API**
+**Symlink (Linux / macOS) — one source of truth for Compose + `backend/.env`:**
 
-   ```bash
-   cd backend
-   go run ./cmd/api
-   ```
+```bash
+ln -sf backend/.env .env
+```
 
-   Or build and run:
+**Windows (no `ln`):** copy `backend\.env` to `.env` at the repo root when you change settings.
 
-   ```bash
-   cd backend
-   make build
-   make run
-   ```
+**Alternative — no root `.env`:**
 
-   Default HTTP listen address is **`:8080`** (Gin).
+```bash
+docker compose --env-file backend/.env up -d --build
+```
 
-7. **Run the dashboard**
+### 3. Docker Compose
 
-   ```bash
-   cd fraud-dashboard
-   npm ci
-   npm run dev
-   ```
+From the **repository root** (after step 2 (defining the .env file)):
 
-   The dev server proxies **`/api/*`** to `http://localhost:8080` (with the `/api` prefix stripped) so browser routes like **`/users`** stay the SPA while fetches use **`/api/users`**, etc. See [`fraud-dashboard/vite.config.ts`](fraud-dashboard/vite.config.ts) and [`fraud-dashboard/src/api/endpoints.ts`](fraud-dashboard/src/api/endpoints.ts).
+```bash
+docker compose up -d --build
+```
+
+- `**--build**` builds or rebuilds the `**api**` and `**web**` images when needed — you do **not** run `docker build` separately for these services.
+- **Services:** `postgres`, `redis`, `rabbitmq`, `api` (HTTP + Rabbit consumers in one process), `web` (static UI; Nginx proxies `**/api`** → `**api:8080`** inside the network).
+
+**After you change application source** (`[backend/](backend/)` Go code or `[fraud-dashboard/](fraud-dashboard/)` UI): Compose does **not** bind-mount the repo into `**api**` or `**web**`; each image bakes in a built binary or static assets. A container that is already running keeps the old build until the image is rebuilt and the service recreated. Examples:
+
+```bash
+docker compose up -d --build api   # backend only
+docker compose up -d --build web   # dashboard only
+docker compose up -d --build       # both app images
+```
+
+If you run the API on the host (`**go run ./cmd/api**`), you skip this rebuild step for backend changes.
+
+**Check that containers are up:**
+
+```bash
+docker compose ps
+```
+
+**Check the API** (default host port **8080**; use your `**API_HOST_PORT`** from `backend/.env` if different):
+
+```bash
+curl -sS http://localhost:8080/health
+```
+
+**Open the UI** (default `**WEB_HOST_PORT` 8088**):
+
+```text
+http://localhost:8088/
+```
+
+- Do not use the same **host** port twice (e.g. `**go run`** on **8080** while `**API_HOST_PORT=8080`** maps Docker there).
+- Use `**docker compose`** (or legacy `**docker-compose**` with the same `[docker-compose.yml](docker-compose.yml)`).
+
+**Stop the stack:**
+
+```bash
+docker compose down
+```
+
+### 4. Database migrations
+
+No manual step: migrations run when the API process starts (`[backend/cmd/api/main.go](backend/cmd/api/main.go)`), in Docker or on the host.
+
+### 5. Run the API on the host (instead of the `api` container)
+
+```bash
+cd backend
+go run ./cmd/api
+```
+
+**Or** build a binary and run it:
+
+```bash
+cd backend
+go build -o bin/api ./cmd/api
+./bin/api
+```
+
+**Optional** (`[backend/Makefile](backend/Makefile)`): `make build`, `make run`, or `make daemon` (auto-rebuild while developing).
+
+Listen address: env `**HTTP_LISTEN`** (default `**:8080`**, see `[backend/internal/config/config.go](backend/internal/config/config.go)`).
+
+### 6. Run the dashboard on the host (Vite dev server)
+
+```bash
+cd fraud-dashboard
+npm ci
+npm run dev
+```
+
+Then open the URL Vite prints (often `**http://localhost:5173**`). The dev server proxies `**/api/***` to `**http://localhost:8080**` (see `[fraud-dashboard/vite.config.ts](fraud-dashboard/vite.config.ts)` and `[fraud-dashboard/src/api/endpoints.ts](fraud-dashboard/src/api/endpoints.ts)`).
 
 ---
 
 ## USAGE GUIDE
 
-- With **Docker** and **`backend/.env`** configured, start the API, then start **`fraud-dashboard`** in dev mode.
-- Open the dashboard URL printed by Vite (typically **`http://localhost:5173`**). Ensure the API is on **port 8080** or change the proxy target in `fraud-dashboard/vite.config.ts`.
-- Use **Swagger UI** for interactive REST exploration: **`http://localhost:8080/swagger/index.html`** (after the API is running).
-- **Live transactions** page consumes **SSE** at **`/stream/transactions`** (proxied from the dashboard in dev).
+- **Docker UI:** after `docker compose up`, open `**http://localhost:8088/`** .
+- **Local dev UI:** `cd fraud-dashboard && npm run dev` → usually `**http://localhost:5173`**; Vite proxies `**/api`** to `**http://localhost:8080**` (`[vite.config.ts](fraud-dashboard/vite.config.ts)`).
+- **Swagger:** `http://localhost:<API_HOST_PORT>/swagger/index.html` (default host port **8080**).
+- **Live transactions** page consumes **SSE** at `**/stream/transactions`** (proxied from the dashboard in dev).
 - **Users** pages list users and show per-user transaction charts/tables with optional date filters.
 
 ---
@@ -81,37 +164,45 @@ Infrastructure runs in **Docker** ([`docker-compose.yml`](docker-compose.yml)): 
 
 High-level REST surface (see Swagger for schemas and status codes):
 
-| Area | Examples |
-|------|----------|
-| Users | `POST /users`, `GET /users`, `GET /users/:id` |
-| Transactions | `POST /transactions`, `GET /transactions`, `GET /transactions/:id`, `DELETE /transactions/:id` |
-| By user | `GET /transactions/user/:id`, `GET /transactions/user/:id/detail`, `GET /transactions/user/:id/summary` |
-| System | `GET /health` |
 
-Implementation entry points: [`backend/internal/user/handler.go`](backend/internal/user/handler.go), [`backend/internal/transaction/handler.go`](backend/internal/transaction/handler.go). Prefer **Swagger** for request/response models and query parameters.
+| Area         | Examples                                                                                                |
+| ------------ | ------------------------------------------------------------------------------------------------------- |
+| Users        | `POST /users`, `GET /users`, `GET /users/:id`                                                           |
+| Transactions | `POST /transactions`, `GET /transactions`, `GET /transactions/:id`, `DELETE /transactions/:id`          |
+| By user      | `GET /transactions/user/:id`, `GET /transactions/user/:id/detail`, `GET /transactions/user/:id/summary` |
+| System       | `GET /health`                                                                                           |
+
+
+Implementation entry points: `[backend/internal/user/handler.go](backend/internal/user/handler.go)`, `[backend/internal/transaction/handler.go](backend/internal/transaction/handler.go)`. Prefer **Swagger** for request/response models and query parameters.
 
 ---
 
 ## MCP USAGE
 
-The backend can expose an **MCP server on stdio** (tools implemented in [`backend/internal/mcp/server.go`](backend/internal/mcp/server.go)) when **`MCP_STDIO_ENABLED=true`**.
+Behavior matches `[backend/cmd/api/main.go](backend/cmd/api/main.go)` and `[backend/internal/config/config.go](backend/internal/config/config.go)`:
 
-- **`get_recent_frauds`** — `from` (required) and `to` in **`DD.MM.YYYY`** (zero-padded day and month). If **`to`** is omitted or empty, the range end is **now** (local clock). Optional `limit`.
-- **`check_user_status`** — `user_id` (UUID string).
+1. `**config.Load()`** reads `**backend/.env`** (via `godotenv`; working directory should be `**backend/**`) then process environment. `**HTTP_LISTEN**` defaults to `**:8080**`. `**MCP_STDIO_ENABLED**` defaults to **false**.
+2. The process **always** opens Postgres/Redis/Rabbit, runs migrations, starts **Rabbit fraud consumers**, builds **Gin**, and calls `**router.Run(HTTP_LISTEN)`** — that is the HTTP API.
+3. If `**MCP_STDIO_ENABLED=true`**, it **also** starts `**mcp.RunStdio`** in a **goroutine**: MCP JSON-RPC on **stdin/stdout** (same OS process as Gin). MCP does not replace HTTP; both run until the process exits.
+4. **Docker `api` service** (`[docker-compose.yml](docker-compose.yml)`): `**environment`** sets `**HTTP_LISTEN=:8080`** and `**MCP_STDIO_ENABLED=false**`, so the container only speaks HTTP on **8080** inside the network. `**ports`** is `**${API_HOST_PORT:-8080}:8080`**: that is **host port → container port 8080**, not the Go variable name; changing `**API_HOST_PORT`** does not change `**HTTP_LISTEN`** inside the app.
+5. **Host `go build` + MCP Inspector** while the `**api`** container already uses host **8080**: the second process needs `**HTTP_LISTEN`** on **some other free TCP port**. If `**bind: address already in use`**, that port is busy — pick a different one, or stop what holds it (often a stuck `**bin/api`**), e.g. `**lsof -iTCP:8090 -sTCP:LISTEN**` (change **8090** to the port you tried).
 
-For **MCP Inspector** or other stdio clients, avoid binding **HTTP :8080** in the same process by also setting **`MCP_STANDALONE=true`**: only stdio MCP runs (no Gin), which prevents **“address already in use”** when you already run the API on 8080 or when a previous Inspector child left the port busy.
+Tools (`[backend/internal/mcp/server.go](backend/internal/mcp/server.go)`): `**get_recent_frauds`** (`from` / optional `to` in `**DD.MM.YYYY`**, optional `**limit**`); `**check_user_status**` (`user_id` UUID).
 
-From the **`backend/`** directory (where `go.mod` lives and `godotenv` loads **`backend/.env`**):
+Example (Compose DB/Rabbit/Redis on localhost ports from `**backend/.env**`):
+
+To connect to MCP Inspector with the commands below, the TCP port you set in `**HTTP_LISTEN**` (the port number after the colon, e.g. **8090**) **must be free on your host**—nothing else may be listening on that port. If it is already in use, choose another free port or stop the process that holds it.
 
 ```bash
-cd /path/to/fraud-detection/backend
-go build -o bin/api ./cmd/api
-MCP_STDIO_ENABLED=true MCP_STANDALONE=true npx @modelcontextprotocol/inspector ./bin/api
+cd fraud-detection/backend   
+go build -o bin/api ./cmd/api/
+HTTP_LISTEN=:8090 MCP_STDIO_ENABLED=true npx @modelcontextprotocol/inspector ./bin/api
 ```
 
-Use the **full path** to `./bin/api` in Inspector’s **Command** field if the working directory is not `backend/`. Ensure **`backend/.env`** exists so Postgres (and other deps) match your Docker stack.
+(Replace **8090** with any **free** host port; use the same value in `**HTTP_LISTEN`** and when opening `**http://localhost:<port>/…`** for this binary’s HTTP API.)
 
-For **Cursor** or full **API + MCP** in one process, enable **`MCP_STDIO_ENABLED`** only and omit **`MCP_STANDALONE`** so Gin still listens on **8080**.
+- **Container API:** `http://localhost:<API_HOST_PORT>/…` (default host port **8080**).  
+- **Rabbit:** this second process still starts `**RABBITMQ_CONSUMER_COUNT`** consumers unless you set that env to **0** for this run.
 
 ---
 
@@ -121,14 +212,16 @@ For **Cursor** or full **API + MCP** in one process, enable **`MCP_STDIO_ENABLED
 
 Sends synthetic `POST /transactions` traffic against a running API.
 
-| Option | Meaning | Default |
-|--------|---------|---------|
-| `--duration=<seconds>` | How long the script runs | `30` |
-| `--rate=<rps>` | Requests per second | `5` |
-| `--anomaly=<0-100>` | Probability of “anomaly-style” requests | `30` |
-| `-h`, `--help` | Help | |
 
-Environment: **`BASE_URL`** (default `http://localhost:8080`).
+| Option                 | Meaning                                 | Default |
+| ---------------------- | --------------------------------------- | ------- |
+| `--duration=<seconds>` | How long the script runs                | `30`    |
+| `--rate=<rps>`         | Requests per second                     | `5`     |
+| `--anomaly=<0-100>`    | Probability of “anomaly-style” requests | `30`    |
+| `-h`, `--help`         | Help                                    |         |
+
+
+Environment: `**BASE_URL`** (default `http://localhost:8080`).
 
 Example:
 
@@ -139,22 +232,25 @@ cd backend
 
 ### `backend/scripts/manual-input.sh`
 
+Should have user before or it will return user not found error!
+
 Creates **one** transaction via `POST /transactions`.
 
 ```text
-./scripts/manual-input.sh <user_id> <amount> <location> [--base-url URL]
+./scripts/manual-input.sh <user_id> <amount> <location>
 Example: ./scripts/manual-input.sh 1a24123e-c7dd-4817-895d-e7f4260d06ca 3000 istanbul
 ```
 
-Requires **`curl`** and **`jq`**. **`BASE_URL`** defaults to `http://localhost:8080`.
+Requires `**curl**` and `**jq**` defaults to `http://localhost:8080`.
 
 ---
 
 ## MCP TEST DOCUMENTED
 
-1. Build the binary and start **MCP Inspector** from **`backend/`** with **`MCP_STDIO_ENABLED=true`** and **`MCP_STANDALONE=true`** (see [MCP USAGE](#mcp-usage)).
-2. In the Inspector UI, choose **stdio**, set **Command** to your built **`bin/api`** (or `go` with `-C` and arguments per Inspector docs), **working directory** to **`backend/`**, and pass the same env vars as in `.env`.
-3. Click **Connect** — you should see tools **`get_recent_frauds`** and **`check_user_status`**.
-4. Run **`get_recent_frauds`** with e.g. `from` **`01.05.2026`**, leave **`to`** empty for “until now”, or set **`02.05.2026`** for an end-of-day upper bound; expect JSON array of fraud transactions or a clear tool error string.
-5. Run **`check_user_status`** with a valid **`user_id`** UUID; expect JSON with user fields including **`risk_rate`**.
+1. Compose up (infra + `**api**` if you want the container API on host **8080**).
+2. From `**backend/`**, run the two commands under [MCP USAGE](#mcp-usage) (`npx` spawns `**./bin/api`** with the exported env).
+3. Inspector **Connect** → tools `**get_recent_frauds`**, `**check_user_status`**.
+4. Run `**get_recent_frauds**` with e.g. `from` `**01.05.2026**`, leave `**to**` empty for “until now”, or set `**02.05.2026**` for an end-of-day upper bound; expect JSON array of fraud transactions or a clear tool error string.
+5. Run `**check_user_status**` with a valid `**user_id**` UUID; expect JSON with user fields including `**risk_rate**`.
 6. Optional automated parse tests: `cd backend && go test ./internal/mcp/ -count=1`.
+

@@ -68,8 +68,8 @@ type AppConfig struct {
 	DB              DBConfig
 	RabbitMQ        RabbitMQConfig
 	Redis           RedisConfig
+	HTTPListenAddr  string
 	MCPStdioEnabled bool
-	MCPStandalone   bool
 }
 
 func Load() AppConfig {
@@ -102,16 +102,24 @@ func loadConfig() AppConfig {
 			Port:          requireEnv("RABBITMQ_PORT"),
 			User:          requireEnv("RABBITMQ_USER"),
 			Password:      requireEnv("RABBITMQ_PASSWORD"),
-			ConsumerCount: envIntOrDefault("RABBITMQ_CONSUMER_COUNT", 4),
+			ConsumerCount: envIntNonNegativeOrDefault("RABBITMQ_CONSUMER_COUNT", 4),
 			PrefetchCount: envIntOrDefault("RABBITMQ_PREFETCH_COUNT", 10),
 		},
 		Redis: RedisConfig{
 			Host: requireEnv("REDIS_HOST"),
 			Port: requireEnv("REDIS_PORT"),
 		},
+		HTTPListenAddr:  envStringOrDefault("HTTP_LISTEN", ":8080"),
 		MCPStdioEnabled: envBoolOrDefault("MCP_STDIO_ENABLED", false),
-		MCPStandalone:   envBoolOrDefault("MCP_STANDALONE", false),
 	}
+}
+
+func envStringOrDefault(key, defaultValue string) string {
+	val := strings.TrimSpace(os.Getenv(key))
+	if val == "" {
+		return defaultValue
+	}
+	return val
 }
 
 func requireEnv(key string) string {
@@ -150,5 +158,18 @@ func envIntOrDefault(key string, defaultValue int) int {
 		return defaultValue
 	}
 
+	return parsed
+}
+
+func envIntNonNegativeOrDefault(key string, defaultValue int) int {
+	val := os.Getenv(key)
+	if val == "" {
+		return defaultValue
+	}
+	parsed, err := strconv.Atoi(val)
+	if err != nil || parsed < 0 {
+		log.Printf("invalid %s=%q, using default %d", key, val, defaultValue)
+		return defaultValue
+	}
 	return parsed
 }

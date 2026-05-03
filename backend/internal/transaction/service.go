@@ -67,14 +67,6 @@ func (s *Service) CreateTransaction(ctx context.Context, transaction *domain.Tra
 
 	s.emitTransactionCreatedSSE(ctx, transaction.ID)
 
-	if err := s.SetLastLocationByUserID(ctx, transaction.UserID, transaction.Location); err != nil {
-		log.Printf("set last location cache after create transaction: %v", err)
-	}
-	if s.cache != nil {
-		if err := s.cache.SetLastTransactionCreatedAtByUserID(ctx, transaction.UserID, transaction.CreatedAt); err != nil {
-			log.Printf("set last transaction created at cache after create transaction: %v", err)
-		}
-	}
 	if s.cache != nil {
 		if requestCount, err := s.cache.IncrementAndGetRequestCountByUserID(ctx, transaction.UserID, transaction.CreatedAt); err != nil {
 			log.Printf("increment request count cache after create transaction: %v", err)

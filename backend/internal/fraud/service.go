@@ -252,7 +252,7 @@ func (s *Service) evaluateLocationRule(
 	}
 	matched := computeLocationImpossibleTravelMatch(currentTransaction, previousTransaction, hasPrevious, cacheInputs)
 
-	if s.cache != nil && !matched {
+	if s.cache != nil && !matched && distance.LocationUsableForImpossibleTravel(currentTransaction.Location) {
 		if err := s.cache.SetLastLocationByUserID(ctx, currentTransaction.UserID, currentTransaction.Location); err != nil {
 			return false, errors.Join(ErrLastLocationCacheFailed, err)
 		}
