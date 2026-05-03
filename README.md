@@ -10,7 +10,7 @@ Infrastructure runs in **Docker** ([`docker-compose.yml`](docker-compose.yml)): 
 
 ### Architecture diagram (image)
 
-Place or replace the picture here by updating the file **[`docs/architecture.png`](docs/architecture.png)** in the repo root (same path referenced below).
+**[`docs/architecture.png`](docs/architecture.png)** 
 
 ![System architecture](docs/architecture.png)
 
@@ -21,7 +21,10 @@ Place or replace the picture here by updating the file **[`docs/architecture.png
 1. **Clone** this repository and `cd` into it.
 
 2. **Environment for Docker Compose**  
-   At the **repository root**, create a `.env` file with the variables expected by [`docker-compose.yml`](docker-compose.yml) (same names as in [`backend/.env.example`](backend/.env.example): Postgres database/user/password/host/port, Redis host/port, RabbitMQ host/port/user/password/management port). `docker compose` reads the root `.env` for substitution.
+   At the **repository root**, create a `.env` file with the variables expected by [`docker-compose.yml`](docker-compose.yml) (same names as in [`backend/.env.example`](backend/.env.example): 
+   Postgres database/user/password/host/port,
+   Redis host/port, 
+   RabbitMQ host/port/user/password/management port). `docker compose` reads the root `.env` for substitution.
 
 3. **Start infrastructure**
 
@@ -60,7 +63,7 @@ Place or replace the picture here by updating the file **[`docs/architecture.png
    npm run dev
    ```
 
-   The dev server proxies `/users`, `/transactions`, and `/stream` to `http://localhost:8080` per Vite config.
+   The dev server proxies **`/api/*`** to `http://localhost:8080` (with the `/api` prefix stripped) so browser routes like **`/users`** stay the SPA while fetches use **`/api/users`**, etc. See [`fraud-dashboard/vite.config.ts`](fraud-dashboard/vite.config.ts) and [`fraud-dashboard/src/api/endpoints.ts`](fraud-dashboard/src/api/endpoints.ts).
 
 ---
 
@@ -140,22 +143,10 @@ Creates **one** transaction via `POST /transactions`.
 
 ```text
 ./scripts/manual-input.sh <user_id> <amount> <location> [--base-url URL]
+Example: ./scripts/manual-input.sh 1a24123e-c7dd-4817-895d-e7f4260d06ca 3000 istanbul
 ```
 
 Requires **`curl`** and **`jq`**. **`BASE_URL`** defaults to `http://localhost:8080`.
-
-### `go run ./cmd/seed-transaction-dates` (`backend/cmd/seed-transaction-dates`)
-
-Spreads `created_at` for the **latest N** transactions of a user over a time window (local/dev utility).
-
-| Flag | Meaning | Default |
-|------|---------|---------|
-| `-user` | User UUID (required) | — |
-| `-n` | How many latest rows to touch | `20` |
-| `-days` | Window length in days (now − days → now, UTC) | `14` |
-| `-dry-run` | Print planned timestamps only | `false` |
-
-Run from `backend/` with the same env as the API, e.g. `go run ./cmd/seed-transaction-dates -user <uuid> -dry-run`.
 
 ---
 

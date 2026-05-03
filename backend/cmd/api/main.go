@@ -75,7 +75,7 @@ func main() {
 	startFraudConsumers(cfg, rabbitMQClient, workerPool)
 
 	mcpDeps := fraudmcp.Deps{
-		Users:          userService,
+		Users:        userService,
 		Transactions: transactionService,
 	}
 
