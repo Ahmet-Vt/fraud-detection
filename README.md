@@ -8,7 +8,7 @@ This repository is a **fraud-detection** demo stack: a **Go (Gin)** backend stor
 
 Infrastructure runs in **Docker** (`[docker-compose.yml](docker-compose.yml)`): **PostgreSQL**, **Redis**, **RabbitMQ**, `api` (`[backend/Dockerfile](backend/Dockerfile)`), `web` (`[fraud-dashboard/Dockerfile](fraud-dashboard/Dockerfile)`). The backend uses **handler → service → repository**; RabbitMQ consumers and optional stdio MCP run **in the same `api` process** as Gin. Local dashboard dev uses **Vite** (`[fraud-dashboard/vite.config.ts](fraud-dashboard/vite.config.ts)`); the `web` image serves the built SPA and proxies `api` to `api:8080`.
 
-### Technology choices (why these parts)
+### Technology choices
 
 - **Go**  One compiled program can host the HTTP API, background RabbitMQ consumers, and optional MCP in the same process with clear wiring. The standard library and common patterns (interfaces, explicit error handling) keep the fraud pipeline and storage code easy to read and change. It was also a good fit for learning the language on a small, end-to-end service.
 - **React (Vite + TypeScript)**  The dashboard is mostly lists, forms, charts, and a live feed. React’s component model and TypeScript’s types help keep that UI organized as it grows. **Server-Sent Events** map cleanly to “append or update rows when the server pushes an event,” without a custom binary protocol in the browser.
@@ -17,7 +17,7 @@ Infrastructure runs in **Docker** (`[docker-compose.yml](docker-compose.yml)`): 
 
 ### Architecture diagram
 
-`[docs/architecture.png](docs/architecture.png)` — high-level system view.
+![Architecture — high-level system view](docs/architecture.png)
 
 ### Backend composition (`[backend/cmd/api/main.go](backend/cmd/api/main.go)`)
 
